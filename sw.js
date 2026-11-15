@@ -51,8 +51,6 @@ self.addEventListener('install', (event) => {
       const res = await fetch(CDN_SUPABASE);
       if (res.ok) await cache.put(CDN_SUPABASE, res);
     } catch (e) { /* sin conexión durante la instalación */ }
-
-    await self.skipWaiting();
   })());
 });
 
@@ -65,8 +63,14 @@ self.addEventListener('activate', (event) => {
         .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
         .map((k) => caches.delete(k))
     );
-    await self.clients.claim();
   })());
+});
+
+/* ---------- Mensaje desde pwa.js para activar la versión nueva ---------- */
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 /* ---------- Peticiones ---------- */
@@ -142,4 +146,3 @@ async function staleWhileRevalidate(event, req) {
   }
   return (await network) || new Response('', { status: 503, statusText: 'Sin conexión' });
 }
-

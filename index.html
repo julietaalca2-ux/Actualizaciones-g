@@ -1,1 +1,970 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="application-name" content="ÖG">
+<meta name="mobile-web-app-capable" content="yes">
+<title>ÖG — Social</title>
 
+<!-- CONFIGURACIÓN PWA -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ÖG">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<!-- ESTILOS -->
+<link rel="stylesheet" href="css/style.css">
+</head>
+
+<body id="appBody">
+
+<!-- ======================================================================= -->
+<!-- 1. OVERLAYS INICIALES (SPLASH Y AUTENTICACIÓN)                          -->
+<!-- ======================================================================= -->
+<div id="appSplashScreen">
+ <div class="splash-logo-container">
+  <div class="splash-logo">ÖG<span style="color:#3b82f6">.</span></div>
+ </div>
+</div>
+
+<div id="authWelcomeOverlay">
+ <div class="auth-brand-container">
+  <div class="auth-logo">ÖG<span style="color:#3b82f6">.</span></div>
+  <div class="auth-tagline">Regístrate para ver fotos, historias e interacciones de tus amigos.</div>
+
+  <div class="auth-forms-container">
+   <div id="authWelcomePanel" class="auth-panel active">
+    <button class="primary" onclick="switchAuthSubView('signup')">Crear cuenta</button>
+    <button class="secondary" onclick="switchAuthSubView('signin')">Iniciar sesión</button>
+    <button class="secondary" id="authInstallAndroidBtn" style="display:none;" onclick="triggerAndroidInstall()">Instalar ÖG</button>
+    <button class="secondary" id="authInstallIosBtn" style="display:none;" onclick="openIosInstallModal()">Cómo instalar ÖG</button>
+   </div>
+
+   <div id="authSignupPanel" class="auth-panel">
+    <input class="field" id="regUsername" placeholder="Nombre de usuario (ej. julieta)">
+    <input class="field" id="regEmail" type="email" placeholder="Correo electrónico" autocomplete="email">
+    <input class="field" id="regPassword" type="password" placeholder="Contraseña (mín. 8 caracteres)" autocomplete="new-password">
+    <button class="primary" onclick="executeSignUp()">Registrarse</button>
+    <button class="secondary" onclick="switchAuthSubView('welcome')">Volver</button>
+   </div>
+
+   <div id="authSigninPanel" class="auth-panel">
+    <input class="field" id="loginEmail" type="email" placeholder="Correo electrónico" autocomplete="email">
+    <input class="field" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button class="primary" onclick="executeSignIn()">Iniciar sesión</button>
+    <button class="secondary" onclick="switchAuthSubView('welcome')">Volver</button>
+   </div>
+
+   <p id="authOverlayStatus" class="status" style="margin-top:8px"></p>
+  </div>
+ </div>
+ <div style="font-size:12px;color:#888888">ÖG — Optimized Supabase Engine</div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- 2. HEADER FIJO SUPERIOR                                                 -->
+<!-- ======================================================================= -->
+<header>
+ <div class="header-left-slot">
+  <button class="icon" id="headerPlusBtn" onclick="showTab('create')" aria-label="Crear publicación" style="display:none;">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+  <button class="icon" id="headerInstallAndroidBtn" onclick="triggerAndroidInstall()" aria-label="Instalar ÖG" title="Instalar ÖG" style="display:none;color:#3b82f6;">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  </button>
+  <button class="icon" id="headerInstallIosBtn" onclick="openIosInstallModal()" aria-label="Cómo instalar ÖG" title="Cómo instalar ÖG" style="display:none;color:#3b82f6;">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+  </button>
+ </div>
+ <div class="header-center-slot" id="headerLogoSlot" style="display:flex;">
+  <div class="logo">ÖG<span style="color:#3b82f6">.</span></div>
+ </div>
+ <div class="header-right-slot" id="header-default-icons">
+  <button class="icon" onclick="openCameraModal()" aria-label="Cámara">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+  </button>
+  <button class="icon" onclick="showTab('notifications')" aria-label="Actividad">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+  </button>
+ </div>
+ <div class="header-right-slot" id="header-profile-icons" style="display:none">
+  <button class="icon" onclick="openMenuSection()" aria-label="Menú">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+ </div>
+</header>
+
+<!-- ======================================================================= -->
+<!-- 3. VISTAS PRINCIPALES (<main>)                                          -->
+<!-- ======================================================================= -->
+<main>
+
+<!-- FEED -->
+<div id="feed" class="active">
+ <div class="stories" id="storiescontainer">
+  <div class="story" id="mystorybtn" onclick="handleStoryClick()">
+   <div class="story-avatar-container" id="mystoryavatar-container">
+    <div class="story-avatar-inner" id="mystoryavatar">
+     <div style="font-size:24px">👤</div>
+    </div>
+    <div class="story-plus-badge" id="mystorybadge" onclick="event.stopPropagation(); openCameraModal();">+</div>
+   </div>
+   Tu historia
+  </div>
+ </div>
+ <div id="posts"></div>
+ <div id="feedLoader" style="text-align:center;padding:20px;color:#888888;font-size:13px;display:none;">Cargando más publicaciones...</div>
+</div>
+
+<!-- MENSAJES / BANDEJA DE ENTRADA -->
+<div id="messagesPage" class="section">
+ <div style="padding:16px;border-bottom:1px solid #eeeeee">
+  <h2 style="margin:0 0 10px 0">Chat</h2>
+  <div class="explore-search-wrapper">
+   <svg class="explore-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+   <input class="explore-search-input" id="dmSearchInput" placeholder="Buscar usuario para chatear..." oninput="searchUsersForChat()">
+  </div>
+ </div>
+ <div id="dmSearchResults" style="padding: 0 16px;"></div>
+ <div id="dmConversationsList">
+  <div class="activity-empty">Cargando conversaciones...</div>
+ </div>
+</div>
+
+<!-- EXPLORAR Y BUSCADOR -->
+<div id="explore" class="section">
+ <div class="explore-top-bar">
+  <div class="explore-search-wrapper">
+   <svg class="explore-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+   <input class="explore-search-input" id="search" placeholder="Buscar..." oninput="handleExploreSearchInput()" onfocus="handleExploreSearchFocus()">
+  </div>
+  <div class="search-categories-bar" id="searchCategoriesBar">
+   <button class="search-cat-tab active" onclick="switchSearchTab('foryou', this)">Para ti</button>
+   <button class="search-cat-tab" onclick="switchSearchTab('profiles', this)">Perfiles</button>
+   <button class="search-cat-tab" onclick="switchSearchTab('audios', this)">Audios</button>
+   <button class="search-cat-tab" onclick="switchSearchTab('hashtags', this)">Hashtags</button>
+  </div>
+ </div>
+
+ <div id="exploreDefaultView" class="search-results-section active">
+  <div class="explore-grid" id="exploreGrid"></div>
+ </div>
+
+ <div id="exploreSearchResultsView" class="search-results-section">
+  <div id="searchTab-foryou" class="search-tab-content active">
+   <div id="searchForYouResults" class="explore-grid"></div>
+  </div>
+  <div id="searchTab-profiles" class="search-tab-content" style="display:none;">
+   <div id="searchProfilesResults"></div>
+  </div>
+  <div id="searchTab-audios" class="search-tab-content" style="display:none;">
+   <div id="searchAudiosResults" style="color:#666666; padding:20px; text-align:center;">No hay audios disponibles para esta búsqueda.</div>
+  </div>
+  <div id="searchTab-hashtags" class="search-tab-content" style="display:none;">
+   <div id="searchHashtagsResults" style="color:#666666; padding:20px; text-align:center;">No hay hashtags disponibles para esta búsqueda.</div>
+  </div>
+ </div>
+</div>
+
+<!-- CREAR PUBLICACIÓN -->
+<div id="create" class="section" style="padding: 16px;">
+ <h2 style="margin-top:0">Nueva publicación</h2>
+ <p class="muted">Comparte momentos con tu comunidad usando fotos y emojis.</p>
+
+ <div class="create-card">
+  <div class="create-media-dropzone" onclick="document.getElementById('postImageFileInput').click()" id="dropzoneBox">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+   <span style="font-weight:600;font-size:14px;color:#111111">Agregar foto o imagen</span>
+   <span class="muted" style="font-size:11px">Formatos JPG, PNG, WEBP (Máx. 5MB)</span>
+  </div>
+
+  <div id="postImagePreviewContainer" style="display:none;margin-bottom:14px;position:relative;border-radius:12px;overflow:hidden;aspect-ratio:1/1;background:#f9f9f9">
+   <img id="postImagePreviewImg" style="width:100%;height:100%;object-fit:cover" alt="Previsualización" loading="lazy">
+   <button class="secondary" style="position:absolute;top:10px;right:10px;padding:6px 12px;font-size:12px;background:rgba(255,255,255,0.9)" onclick="removePostImage()">Cambiar foto</button>
+  </div>
+  <input type="file" id="postImageFileInput" class="hidden-file" accept="image/jpeg,image/png,image/webp" onchange="handlePostImageSelect(this)">
+
+  <label class="muted" style="font-size:12px;font-weight:600">Título / Descripción</label>
+  <textarea id="newpost" placeholder="Escribe un título llamativo (ej. ¡Atardecer increíble! 🌅✨)..."></textarea>
+  
+  <button class="primary" id="publishBtn" style="margin-top:16px" onclick="publish()">Compartir publicación</button>
+  <p id="publishStatus" class="status"></p>
+ </div>
+</div>
+
+<!-- ACTIVIDAD / NOTIFICACIONES -->
+<div id="notifications" class="section" style="padding: 16px;">
+ <h2 style="margin-top:0">Actividad</h2>
+ <p class="muted">Novedades e interacciones en tiempo real.</p>
+ <div id="activitylist">
+  <p class="muted">Cargando actividad...</p>
+ </div>
+</div>
+
+<!-- MI PERFIL -->
+<div id="profile" class="section">
+ <div class="profile-header-modern">
+  <div class="profile-top-info-row">
+   <div class="profile-avatar-container-mod" id="myProfileAvatarWrapper" onclick="handleStoryClick()">
+    <div class="profile-avatar-inner-mod" id="myavatar">
+     <div style="font-size:28px">👤</div>
+    </div>
+   </div>
+
+   <div class="profile-stats-row">
+    <div class="profile-stat-box" onclick="showTab('profile'); switchProfileTab('posts')">
+     <span class="profile-stat-num" id="mypostscount">0</span>
+     <span class="profile-stat-label">publicaciones</span>
+    </div>
+    <div class="profile-stat-box" onclick="openFollowersModal(currentUser?.id)">
+     <span class="profile-stat-num" id="myfollowerscount">0</span>
+     <span class="profile-stat-label">seguidores</span>
+    </div>
+    <div class="profile-stat-box" onclick="openFollowingModal(currentUser?.id)">
+     <span class="profile-stat-num" id="myfollowingcount">0</span>
+     <span class="profile-stat-label">siguiendo</span>
+    </div>
+   </div>
+  </div>
+
+  <div class="profile-bio-area">
+   <h2 class="profile-display-name">
+    <span id="myname">Mi perfil</span>
+    <span id="mypronouns" class="profile-pronouns-tag"></span>
+   </h2>
+   <p class="profile-username-tag" id="myusername">@usuario</p>
+   <p class="profile-bio-text" id="mybio">Bienvenido a ÖG.</p>
+   <div id="myWebsiteContainer" style="display:none;">
+    <a href="#" id="myWebsiteLink" class="profile-website-link" target="_blank" rel="noopener noreferrer">
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+     <span id="myWebsiteText">sitio web</span>
+    </a>
+   </div>
+  </div>
+
+  <div class="profile-action-buttons-row" id="profile-actions">
+   <button onclick="openEditProfileModal()">Editar perfil</button>
+   <button onclick="shareProfileLink()">Compartir perfil</button>
+  </div>
+ </div>
+
+ <div class="highlights-scroll-container" id="highlightsScrollContainer">
+  <div class="highlight-item" onclick="createNewHighlightModal()">
+   <div class="highlight-circle">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="width:24px;height:24px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+   </div>
+   <span class="highlight-title">Nuevo</span>
+  </div>
+ </div>
+
+ <div class="profile-tabs-bar">
+  <button class="profile-tab-btn active" id="tabBtn-posts" onclick="switchProfileTab('posts')" aria-label="Publicaciones">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+  </button>
+  <button class="profile-tab-btn" id="tabBtn-videos" onclick="switchProfileTab('videos')" aria-label="Videos">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+  </button>
+  <button class="profile-tab-btn" id="tabBtn-saved" onclick="switchProfileTab('saved')" aria-label="Guardados">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+  </button>
+  <button class="profile-tab-btn" id="tabBtn-tagged" onclick="switchProfileTab('tagged')" aria-label="Etiquetados">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+  </button>
+ </div>
+
+ <div id="profileTabPane-posts" class="profile-tab-content-pane active">
+  <div class="ig-posts-grid" id="mypostsgrid"></div>
+ </div>
+ <div id="profileTabPane-videos" class="profile-tab-content-pane">
+  <div class="activity-empty" style="padding:50px 20px;">No hay videos publicados.</div>
+ </div>
+ <div id="profileTabPane-saved" class="profile-tab-content-pane">
+  <div class="ig-posts-grid" id="savedPostsGridProfile"></div>
+ </div>
+ <div id="profileTabPane-tagged" class="profile-tab-content-pane">
+  <div class="activity-empty" style="padding:50px 20px;">No hay publicaciones etiquetadas.</div>
+ </div>
+</div>
+
+<!-- PERFIL PÚBLICO -->
+<div id="publicprofile" class="section">
+ <div style="padding:10px 16px;border-bottom:1px solid #eeeeee;display:flex;align-items:center;gap:12px">
+  <button class="secondary" style="padding:6px 12px" onclick="showTab('explore')">← Volver</button>
+  <strong id="publicheadername" style="font-size:15px">Perfil</strong>
+ </div>
+
+ <div class="profile-header-modern">
+  <div class="profile-top-info-row">
+   <div class="profile-avatar-container-mod">
+    <div class="profile-avatar-inner-mod" id="publicavatar"><div style="font-size:28px">👤</div></div>
+   </div>
+   
+   <div class="profile-stats-row">
+    <div class="profile-stat-box" onclick="switchPublicProfileTab('posts')">
+     <span class="profile-stat-num" id="publicpostscount">0</span>
+     <span class="profile-stat-label">publicaciones</span>
+    </div>
+    <div class="profile-stat-box" onclick="openFollowersModal(viewedProfile?.id)">
+     <span class="profile-stat-num" id="publicfollowerscount">0</span>
+     <span class="profile-stat-label">seguidores</span>
+    </div>
+    <div class="profile-stat-box" onclick="openFollowingModal(viewedProfile?.id)">
+     <span class="profile-stat-num" id="publicfollowingcount">0</span>
+     <span class="profile-stat-label">siguiendo</span>
+    </div>
+   </div>
+  </div>
+
+  <div class="profile-bio-area">
+   <h2 class="profile-display-name">
+    <span id="publicname">Usuario</span>
+    <span id="publicpronouns" class="profile-pronouns-tag"></span>
+   </h2>
+   <p class="profile-username-tag" id="publicusername">@usuario</p>
+   <p class="profile-bio-text" id="publicbio"></p>
+   <div id="publicWebsiteContainer" style="display:none;">
+    <a href="#" id="publicWebsiteLink" class="profile-website-link" target="_blank" rel="noopener noreferrer">
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+     <span id="publicWebsiteText">sitio web</span>
+    </a>
+   </div>
+  </div>
+
+  <div class="profile-action-buttons-row">
+   <button class="primary-action" id="publicfollow" onclick="toggleFollow()">Seguir</button>
+   <button onclick="openDirectChatWithUser(viewedProfile?.id)">Mensaje</button>
+  </div>
+  <p id="publicstatus" class="status"></p>
+ </div>
+
+ <div class="highlights-scroll-container" id="publicHighlightsScrollContainer"></div>
+
+ <div class="profile-tabs-bar">
+  <button class="profile-tab-btn active" id="pubTabBtn-posts" onclick="switchPublicProfileTab('posts')" aria-label="Publicaciones">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+  </button>
+  <button class="profile-tab-btn" id="pubTabBtn-videos" onclick="switchPublicProfileTab('videos')" aria-label="Videos">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+  </button>
+  <button class="profile-tab-btn" id="pubTabBtn-tagged" onclick="switchPublicProfileTab('tagged')" aria-label="Etiquetados">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+  </button>
+ </div>
+
+ <div id="pubTabPane-posts" class="profile-tab-content-pane active">
+  <div class="ig-posts-grid" id="publicposts"></div>
+ </div>
+ <div id="pubTabPane-videos" class="profile-tab-content-pane">
+  <div class="activity-empty" style="padding:50px 20px;">No hay videos publicados.</div>
+ </div>
+ <div id="pubTabPane-tagged" class="profile-tab-content-pane">
+  <div class="activity-empty" style="padding:50px 20px;">No hay publicaciones etiquetadas.</div>
+ </div>
+</div>
+
+<!-- SALA DE CHAT -->
+<div id="chatRoomPage" class="section">
+ <div class="chat-room-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="showTab('messagesPage')">← Volver</button>
+  <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;" onclick="openChatDetailsPage()">
+   <div id="chatRoomHeaderAvatar">
+    <span id="chatRoomOnlineDot" class="online-dot"></span>
+   </div>
+   <div style="min-width:0;flex:1;">
+    <strong id="chatRoomTitle" style="font-size:14px;display:block;color:#111111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Chat</strong>
+    <small id="chatRoomStatusSub" style="color:#888888;font-size:11px;display:block;">Desconectado</small>
+   </div>
+  </div>
+  <button class="icon" onclick="openChatDetailsPage()" aria-label="Detalles">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+  </button>
+ </div>
+
+ <div class="chat-messages-container" id="chatMessagesContainer"></div>
+
+ <div class="chat-input-footer">
+  <div id="replyingBar" class="replying-bar">
+   <div>Respondiendo a: <strong id="replyingTextSnippet">...</strong></div>
+   <button class="secondary" style="padding:2px 6px;font-size:11px;" onclick="cancelReply()">✕</button>
+  </div>
+  <div class="chat-input-row">
+   <input type="text" class="story-reply-input" id="chatMessageInput" placeholder="Escribe un mensaje..." style="border-color:#dddddd; color:#111111;" onkeypress="if(event.key==='Enter')sendChatMessage()">
+   <button class="primary" style="width:auto;padding:10px 20px;border-radius:24px;" onclick="sendChatMessage()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+   </button>
+  </div>
+ </div>
+</div>
+
+<!-- DETALLES DEL CHAT -->
+<div id="chatDetailsPage" class="section">
+ <div class="chat-details-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="showTab('chatRoomPage')">← Volver</button>
+  <strong style="font-size:16px;color:#111111;">Detalles del chat</strong>
+  <div style="position:relative;">
+   <button class="icon" onclick="toggleChatDetailsMenu()" aria-label="Menú">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+   </button>
+   <div id="chatDetailsDropdown" style="display:none;position:absolute;right:0;top:40px;background:#ffffff;border:1px solid #eeeeee;border-radius:12px;padding:6px;width:160px;box-shadow:0 10px 30px rgba(0,0,0,0.1);z-index:50;">
+    <button class="menu-list-btn" style="padding:10px;font-size:13px;border:none;background:none;margin:0;" onclick="handleChatActionMenu('block')">Bloquear</button>
+    <button class="menu-list-btn" style="padding:10px;font-size:13px;border:none;background:none;margin:0;" onclick="handleChatActionMenu('report')">Reportar</button>
+    <button class="menu-list-btn" style="padding:10px;font-size:13px;border:none;background:none;margin:0;color:#ef4444;" onclick="handleChatActionMenu('restrict')">Restringir</button>
+   </div>
+  </div>
+ </div>
+
+ <div class="chat-details-content">
+  <div class="chat-details-profile-card">
+   <div class="chat-details-avatar" id="chatDetailsAvatarContainer">👤</div>
+   <h3 id="chatDetailsName" style="margin:0 0 4px 0;font-size:18px;color:#111111;">Usuario</h3>
+   <p id="chatDetailsUsername" style="margin:0 0 6px 0;font-size:13px;color:#888888;">@usuario</p>
+   <small id="chatDetailsActivityStatus" style="font-size:12px;color:#22c55e;">Desconectado</small>
+  </div>
+
+  <div class="chat-actions-row-horizontal">
+   <div class="chat-action-pill" onclick="openChatRecipientProfile()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span>Perfil</span>
+   </div>
+   <div class="chat-action-pill" onclick="triggerChatSearch()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <span>Buscar</span>
+   </div>
+   <div class="chat-action-pill" onclick="openMuteOptionsModal()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <span>Silenciar</span>
+   </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px;">
+   <button class="menu-list-btn" onclick="openChatSubSettings('privacy')">
+    <span class="menu-list-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>Privacidad y seguridad</span></span>
+    <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+   </button>
+   <button class="menu-list-btn" onclick="openChatSubSettings('timer')">
+    <span class="menu-list-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Mensajes temporales</span></span>
+    <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+   </button>
+   <button class="menu-list-btn" onclick="openChatSubSettings('nickname')">
+    <span class="menu-list-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span>Apodos</span></span>
+    <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+   </button>
+   <button class="menu-list-btn" onclick="openChatSubSettings('style')">
+    <span class="menu-list-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg><span>Personalizar estilo y fuente</span></span>
+    <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+   </button>
+  </div>
+ </div>
+</div>
+
+<!-- SUB-PANTALLA DE DETALLES DE CHAT -->
+<div id="chatSubSettingsPage" class="section">
+ <div class="chat-details-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="showTab('chatDetailsPage')">← Volver</button>
+  <strong id="chatSubSettingsTitle" style="font-size:16px;color:#111111;">Configuración</strong>
+  <div style="width:40px;"></div>
+ </div>
+ <div class="chat-details-content" id="chatSubSettingsBody"></div>
+</div>
+
+<!-- MENÚ PRINCIPAL Y SUB-PANTALLAS DE CONFIGURACIÓN -->
+<div id="menuSectionPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="closeMenuSection()">← Perfil</button>
+  <strong style="font-size:16px;color:#111111;">Menú</strong>
+ </div>
+ <div class="menu-section-content">
+  <button class="menu-list-btn pwa-install" id="menuInstallAndroidBtn" style="display:none;" onclick="triggerAndroidInstall()">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <span>Instalar ÖG</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn pwa-install" id="menuInstallIosBtn" style="display:none;" onclick="openIosInstallModal()">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+    <span>Cómo instalar ÖG</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn" onclick="openMenuSubPage('menuConfigPage')">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    <span>Configuración</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn" onclick="openMenuSubPage('menuPrivacyPage')">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <span>Privacidad</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn" onclick="openMenuSubPage('menuNotifPage')">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <span>Notificaciones</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn" onclick="openMenuSubPage('menuActivityPage')">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <span>Tu actividad</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn" onclick="openMenuSubPage('menuSavedPage')">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+    <span>Guardados</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn" onclick="openMenuSubPage('menuHelpPage')">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Ayuda</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn" onclick="openMenuSubPage('menuAccountsPage')">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span>Centro de cuentas</span>
+   </span>
+   <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <button class="menu-list-btn danger" onclick="promptLogoutConfirmation()">
+   <span class="menu-list-left">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    <span>Cerrar sesión</span>
+   </span>
+  </button>
+ </div>
+</div>
+
+<div id="menuConfigPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="backToMainMenu('menuConfigPage')">← Menú</button>
+  <strong style="font-size:16px;color:#111111;">Configuración</strong>
+ </div>
+ <div class="menu-section-content">
+  <div class="settings-group">
+   <h4 class="settings-group-title">Preferencias de la aplicación</h4>
+   <div class="settings-row">
+    <div class="settings-row-info">
+     <p class="settings-row-title">Ahorro de datos móviles</p>
+     <p class="settings-row-desc">Reduce la resolución de previsualizaciones cuando usás red celular.</p>
+    </div>
+    <label class="toggle-switch">
+     <input type="checkbox" id="cfgDataSaverToggle" onchange="saveMenuPreferences()">
+     <span class="toggle-slider"></span>
+    </label>
+   </div>
+   <div class="settings-row">
+    <div class="settings-row-info">
+     <p class="settings-row-title">Reproducción automática de contenido</p>
+     <p class="settings-row-desc">Cargar historias y fotos de forma anticipada en el feed.</p>
+    </div>
+    <label class="toggle-switch">
+     <input type="checkbox" id="cfgAutoplayToggle" checked onchange="saveMenuPreferences()">
+     <span class="toggle-slider"></span>
+    </label>
+   </div>
+  </div>
+ </div>
+</div>
+
+<div id="menuPrivacyPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="backToMainMenu('menuPrivacyPage')">← Menú</button>
+  <strong style="font-size:16px;color:#111111;">Privacidad</strong>
+ </div>
+ <div class="menu-section-content">
+  <div class="settings-group">
+   <h4 class="settings-group-title">Visibilidad de la cuenta</h4>
+   <div class="settings-row">
+    <div class="settings-row-info">
+     <p class="settings-row-title">Cuenta privada</p>
+     <p class="settings-row-desc">Solo tus seguidores aprobados podrán ver tus fotos e historias.</p>
+    </div>
+    <label class="toggle-switch">
+     <input type="checkbox" id="privateAccountToggle" onchange="saveMenuPreferences()">
+     <span class="toggle-slider"></span>
+    </label>
+   </div>
+   <div class="settings-row">
+    <div class="settings-row-info">
+     <p class="settings-row-title">Mostrar estado de actividad</p>
+     <p class="settings-row-desc">Permite que otros vean el punto verde cuando estás en línea.</p>
+    </div>
+    <label class="toggle-switch">
+     <input type="checkbox" id="activityStatusToggle" checked onchange="saveMenuPreferences()">
+     <span class="toggle-slider"></span>
+    </label>
+   </div>
+  </div>
+ </div>
+</div>
+
+<div id="menuNotifPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="backToMainMenu('menuNotifPage')">← Menú</button>
+  <strong style="font-size:16px;color:#111111;">Notificaciones</strong>
+ </div>
+ <div class="menu-section-content">
+  <div class="settings-group" style="border-bottom:none">
+   <h4 class="settings-group-title">Alertas en tiempo real</h4>
+   <div class="settings-row">
+    <div class="settings-row-info">
+     <p class="settings-row-title">Me gusta en publicaciones</p>
+    </div>
+    <label class="toggle-switch">
+     <input type="checkbox" id="notifLikesToggle" checked onchange="saveMenuPreferences()">
+     <span class="toggle-slider"></span>
+    </label>
+   </div>
+  </div>
+ </div>
+</div>
+
+<div id="menuActivityPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="backToMainMenu('menuActivityPage')">← Menú</button>
+  <strong style="font-size:16px;color:#111111;">Tu actividad</strong>
+ </div>
+ <div class="menu-section-content">
+  <div id="userOwnActivityContainer">
+   <div class="activity-empty">Cargando tu historial...</div>
+  </div>
+ </div>
+</div>
+
+<div id="menuSavedPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="backToMainMenu('menuSavedPage')">← Menú</button>
+  <strong style="font-size:16px;color:#111111;">Guardados</strong>
+ </div>
+ <div class="menu-section-content" style="padding:0;">
+  <div class="ig-posts-grid" id="savedPostsGrid"></div>
+ </div>
+</div>
+
+<div id="menuHelpPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="backToMainMenu('menuHelpPage')">← Menú</button>
+  <strong style="font-size:16px;color:#111111;">Ayuda</strong>
+ </div>
+ <div class="menu-section-content">
+  <textarea id="helpReportInput" placeholder="Describí el problema..." style="height:100px;"></textarea>
+  <button class="primary" style="margin-top:12px;" onclick="submitHelpReport()">Enviar mensaje a soporte</button>
+  <p id="helpReportStatus" class="status"></p>
+ </div>
+</div>
+
+<div id="menuAccountsPage" class="fullscreen-menu-view">
+ <div class="menu-section-header">
+  <button class="secondary" style="padding:6px 12px;font-size:13px;" onclick="backToMainMenu('menuAccountsPage')">← Menú</button>
+  <strong style="font-size:16px;color:#111111;">Centro de cuentas</strong>
+ </div>
+ <div class="menu-section-content">
+  <input class="field" id="newPasswordInput" type="password" placeholder="Nueva contraseña">
+  <button class="primary" style="margin-top:12px" onclick="updateUserPassword()">Actualizar contraseña</button>
+  <p id="passwordStatus" class="status"></p>
+ </div>
+</div>
+
+</main>
+
+<!-- ======================================================================= -->
+<!-- 4. MODALES GLOBALES Y VISORES FULLSCREEN                                -->
+<!-- ======================================================================= -->
+
+<!-- Cámara -->
+<div id="cameraModal">
+ <video id="cameraVideo" class="camera-video-fullscreen" autoplay playsinline muted></video>
+ <img id="capturedImagePreview" class="camera-video-fullscreen" style="display:none" alt="Vista previa">
+
+ <div class="camera-screen-container">
+  <div class="camera-top-bar">
+   <button class="icon" onclick="closeCameraModal()" aria-label="Cerrar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+   </button>
+   
+   <div class="camera-zoom-container">
+    <span class="camera-zoom-label">🔍</span>
+    <input type="range" id="zoomRangeInput" min="1" max="4" step="0.1" value="1" oninput="adjustZoom(this.value)">
+    <span class="camera-zoom-label" id="zoomValueText">1x</span>
+   </div>
+
+   <button class="icon" onclick="switchCamera()" aria-label="Girar cámara">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 4v5h-.582m0 0a8.001 8.001 0 0 0-14.356-2m15.356 2A8.001 8.001 0 0 1 4 15m0 0v-5h.582m0 0a8.001 8.001 0 0 0 14.356 2"/></svg>
+   </button>
+  </div>
+
+  <div class="camera-bottom-ui">
+   <div class="camera-actions-row">
+    <div class="camera-gallery-icon" onclick="document.getElementById('galleryFileInput').click()" id="galleryThumbIcon">📁</div>
+    <button class="capture-btn" id="captureBtn" onclick="takePhoto()"></button>
+    <div style="width:44px"></div>
+   </div>
+   <button class="primary" id="publishStoryBtn" style="display:none;width:90%;margin:auto;padding:12px 20px;font-size:15px;border-radius:24px;" onclick="uploadCapturedStory()">Compartir en tu historia</button>
+  </div>
+ </div>
+ <input type="file" id="galleryFileInput" class="hidden-file" accept="image/jpeg,image/png,image/webp" onchange="handleGallerySelect(this)">
+</div>
+
+<!-- Visor de Historias -->
+<div id="storyViewer">
+ <div class="story-progress-bars" id="storyProgressBars"></div>
+
+ <div class="story-top-bar">
+  <div class="story-user-info">
+   <div id="storyViewerAvatarContainer" class="story-avatar-container">
+    <div class="story-avatar-inner" id="storyViewerAvatarInner">👤</div>
+   </div>
+   <div>
+    <span id="storyUsername" class="story-username-text">@usuario</span>
+    <span id="storyTimeAgo" class="story-time-text">6 h</span>
+   </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+   <button class="icon" id="storyAddToHighlightTrigger" onclick="openAddToHighlightModal()" style="display:none;color:#fff;" title="Agregar a destacadas">⭐</button>
+   <button class="icon" onclick="closeStoryViewer()" style="color:#fff;">✕</button>
+  </div>
+ </div>
+
+ <div class="story-content-area" id="storyContentAreaContainer">
+  <img id="storyImage" src="" alt="Historia" loading="lazy">
+ </div>
+
+ <div class="story-bottom-bar">
+  <input type="text" class="story-reply-input" placeholder="Enviar mensaje..." id="storyReplyInput">
+  <button class="story-action-icon-btn" id="storyLikeBtn" onclick="toggleStoryLikeAction()" aria-label="Me gusta">
+   <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+  </button>
+  <button class="story-action-icon-btn" onclick="sendStoryReply()" aria-label="Enviar mensaje">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+  </button>
+ </div>
+</div>
+
+<!-- Visor de Historias Destacadas -->
+<div id="highlightViewer">
+ <div class="story-progress-bars" id="highlightProgressBars"></div>
+
+ <div class="story-top-bar">
+  <div class="story-user-info">
+   <div id="highlightViewerAvatarContainer" class="story-avatar-container">
+    <div class="story-avatar-inner" id="highlightViewerAvatarInner">👤</div>
+   </div>
+   <div>
+    <span id="highlightViewerUsername" class="story-username-text">@usuario</span>
+    <span id="highlightViewerTitleText" class="story-time-text">Destacada</span>
+   </div>
+  </div>
+  <button class="icon" onclick="closeHighlightViewer()" style="color:#fff;">✕</button>
+ </div>
+
+ <div class="story-content-area" id="highlightContentAreaContainer">
+  <img id="highlightViewerImage" src="" alt="Historia Destacada" loading="lazy">
+ </div>
+
+ <div class="story-bottom-bar" style="justify-content:center;color:#fff;font-size:13px;" id="highlightViewerCounter">1 / 1</div>
+</div>
+
+<!-- Modal Edición de Perfil -->
+<div id="editProfileModal">
+ <div class="edit-modal-card">
+  <div class="edit-modal-header">
+   <strong style="font-size:16px;color:#111111;">Editar perfil</strong>
+   <button class="secondary" style="padding:4px 10px;font-size:12px;" onclick="closeEditProfileModal()">✕</button>
+  </div>
+
+  <div class="edit-photos-row">
+   <div class="edit-photo-preview-wrap" onclick="document.getElementById('avatarfile').click()">
+    <div class="edit-photo-circle" id="modalAvatarPreviewBox">
+     <span style="font-size:28px">👤</span>
+    </div>
+    <span style="font-size:12px;color:#3b82f6;font-weight:600;">Cambiar foto de perfil</span>
+   </div>
+  </div>
+
+  <input class="hidden-file" id="avatarfile" type="file" accept="image/jpeg,image/png,image/webp" onchange="stageImage('avatar',this)">
+
+  <div>
+   <label class="muted field-label">NOMBRE</label>
+   <input class="field" id="editname" placeholder="Tu nombre">
+  </div>
+  <div>
+   <label class="muted field-label">NOMBRE DE USUARIO</label>
+   <input class="field" id="editusername" placeholder="nombredeusuario">
+  </div>
+  <div>
+   <label class="muted field-label">PRONOMBRES</label>
+   <input class="field" id="editpronouns" placeholder="ej. ella, él, elle">
+  </div>
+  <div>
+   <label class="muted field-label">SITIO WEB / ENLACE PERSONAL</label>
+   <input class="field" id="editwebsite" placeholder="https://tusitio.com">
+  </div>
+  <div>
+   <label class="muted field-label">SEXO</label>
+   <select class="field" id="editgender">
+    <option value="">Prefiero no decirlo</option>
+    <option value="Mujer">Mujer</option>
+    <option value="Hombre">Hombre</option>
+   </select>
+  </div>
+  <div>
+   <label class="muted field-label">BIOGRAFÍA</label>
+   <textarea class="field" id="editbio" placeholder="Escribe algo sobre ti..." rows="3" style="height:80px;resize:none;white-space:pre-wrap;"></textarea>
+  </div>
+
+  <button class="primary" onclick="saveFullProfile()">Guardar cambios</button>
+  <p id="profilestatus" class="status"></p>
+ </div>
+</div>
+
+<!-- Modal Crear Historia Destacada -->
+<div id="highlightModal">
+ <div class="highlight-modal-card">
+  <div class="modal-header-row">
+   <strong style="font-size:16px;">Crear historia destacada</strong>
+   <button class="secondary modal-close-btn" onclick="closeHighlightModal()">✕</button>
+  </div>
+  <div>
+   <label class="muted field-label">TÍTULO DE LA DESTACADA</label>
+   <input class="field" id="highlightTitleInput" placeholder="ej. Viajes, Amigos, 2026">
+  </div>
+  <div>
+   <label class="muted field-label">IMAGEN DE PORTADA</label>
+   <input type="file" id="highlightFile" class="hidden-file" accept="image/jpeg,image/png,image/webp" onchange="stageHighlightCover(this)">
+   <button class="secondary" style="width:100%;margin-top:6px;" onclick="document.getElementById('highlightFile').click()">Seleccionar imagen de portada</button>
+  </div>
+  <button class="primary" id="saveHighlightBtn" onclick="saveNewHighlight()">Publicar destacada</button>
+ </div>
+</div>
+
+<!-- Modal Agregar Historia a Destacada -->
+<div id="addToHighlightModal">
+ <div class="highlight-modal-card">
+  <div class="modal-header-row">
+   <strong style="font-size:16px;">Agregar a destacadas</strong>
+   <button class="secondary modal-close-btn" onclick="closeAddToHighlightModal()">✕</button>
+  </div>
+  <div id="addToHighlightList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+  <button class="secondary" onclick="createNewHighlightFromViewer()">+ Crear nueva destacada</button>
+ </div>
+</div>
+
+<!-- Modal Instrucciones Instalación iPhone (Safari) -->
+<div id="iosInstallModal" onclick="closeIosInstallModal()">
+ <div class="highlight-modal-card" onclick="event.stopPropagation()">
+  <div class="modal-header-row">
+   <strong style="font-size:16px;color:#111111;">Cómo instalar ÖG en iPhone</strong>
+   <button class="secondary modal-close-btn" onclick="closeIosInstallModal()">✕</button>
+  </div>
+  <p class="muted" style="margin:0;font-size:13px;line-height:1.4;">Instalá ÖG en tu pantalla de inicio para abrirla a pantalla completa como una app:</p>
+  <div class="ios-install-steps">
+   <div class="ios-step-row">
+    <span class="ios-step-badge">1</span>
+    <span>Abrí esta página desde <strong>Safari</strong> en tu iPhone.</span>
+   </div>
+   <div class="ios-step-row">
+    <span class="ios-step-badge">2</span>
+    <span>Tocá el ícono <strong>Compartir</strong> (cuadrado con flecha hacia arriba) en la barra inferior de Safari.</span>
+   </div>
+   <div class="ios-step-row">
+    <span class="ios-step-badge">3</span>
+    <span>Deslizá hacia abajo, seleccioná <strong>«Añadir a pantalla de inicio»</strong> y confirmá tocando <strong>«Añadir»</strong>.</span>
+   </div>
+  </div>
+  <button class="primary" onclick="closeIosInstallModal()">Entendido</button>
+ </div>
+</div>
+
+<!-- Modal Confirmar Cierre de Sesión -->
+<div id="logoutConfirmModal" onclick="closeLogoutConfirmation()">
+ <div class="confirm-card" onclick="event.stopPropagation()">
+  <h3 style="margin:0 0 8px 0;font-size:18px;color:#111111;">¿Cerrar sesión en ÖG?</h3>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+   <button class="danger-btn" onclick="executeConfirmedSignOut()">Sí, cerrar sesión</button>
+   <button class="secondary" onclick="closeLogoutConfirmation()">Cancelar</button>
+  </div>
+ </div>
+</div>
+
+<!-- Drawer Seguidores / Seguidos -->
+<div id="followListModal" class="settings-overlay" onclick="closeFollowListModal()">
+ <div class="settings-drawer" style="max-height: 80vh; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+  <div class="settings-handle"></div>
+  <div class="modal-header-row" style="padding-bottom: 12px; margin-bottom: 10px;">
+   <strong id="followModalTitle" style="font-size: 16px; color: #111111;">Seguidores</strong>
+   <button class="secondary" style="padding: 4px 10px; font-size: 12px;" onclick="closeFollowListModal()">✕</button>
+  </div>
+  <div id="followListContainer" style="overflow-y: auto; flex: 1; min-height: 200px;">
+   <div class="activity-empty">Cargando...</div>
+  </div>
+ </div>
+</div>
+
+<!-- Modal Visor de Publicación -->
+<div id="postDetailModal" onclick="closePostDetailModal()">
+ <div class="post-modal-card" onclick="event.stopPropagation()">
+  <div class="post-modal-header">
+   <strong style="font-size:14px; color:#111111;">Publicación</strong>
+   <button class="secondary" style="padding:4px 10px;font-size:12px" onclick="closePostDetailModal()">✕</button>
+  </div>
+  <div class="post-modal-body" id="modalPostContainer"></div>
+ </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- 5. BARRA DE NAVEGACIÓN INFERIOR                                         -->
+<!-- ======================================================================= -->
+<nav id="bottomNavBar">
+ <button class="active" onclick="showTab('feed',this)" aria-label="Inicio">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  <small>Inicio</small>
+ </button>
+ <button onclick="showTab('messagesPage',this)" aria-label="Chat">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  <span id="navUnreadDot" class="nav-msg-badge"></span>
+  <small>Chat</small>
+ </button>
+ <button onclick="showTab('explore',this)" aria-label="Explore">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <small>Explore</small>
+ </button>
+ <button onclick="showTab('profile',this)" aria-label="Perfil">
+  <div class="nav-avatar-ring" id="navAvatarContainer">
+   <svg id="navAvatarPlaceholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   <span id="navOnlineDot" class="online-dot"></span>
+  </div>
+  <small>Perfil</small>
+ </button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

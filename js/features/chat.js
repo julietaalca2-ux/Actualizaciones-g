@@ -24,6 +24,7 @@ async function checkGlobalUnreadMessages() {
  }
 
  const convIds = parts.map(p => p.conversation_id);
+ // Eliminar N+1: traer mensajes recientes de todas las conversaciones en 1 sola consulta
  const { data: recentMsgs } = await db.from('messages')
   .select('conversation_id, created_at, sender_id')
   .in('conversation_id', convIds)
@@ -73,6 +74,7 @@ async function loadConversations() {
 
   const convIds = myParts.map(p => p.conversation_id);
 
+  // Batch paralelo: participantes + últimos mensajes de todas las conversaciones en 2 únicas consultas
   const [allPartsRes, recentMsgsRes] = await Promise.all([
    db.from('conversation_participants').select('conversation_id, user_id').in('conversation_id', convIds),
    db.from('messages')
@@ -362,6 +364,7 @@ async function sendChatMessage() {
  input.value = '';
  cancelReply();
 
+ // Optimistic UI: insertar burbuja de inmediato (0 ms)
  const tempId = 'optimistic-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
  const optimisticMsg = {
   id: tempId,

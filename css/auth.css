@@ -1,0 +1,61 @@
+/* ------------------------------------------------------------------------- */
+/* Splash y Bienvenida / Autenticación                                      */
+/* ------------------------------------------------------------------------- */
+#appSplashScreen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-main);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  opacity: 1;
+  visibility: visible;
+  will-change: opacity;
+}
+#appSplashScreen.fade-out { opacity: 0; visibility: hidden; pointer-events: none; }
+.splash-logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: splashPulse 1.2s ease-in-out infinite alternate;
+}
+.splash-logo { font-size: 56px; font-weight: 700; letter-spacing: -0.06em; color: var(--text-primary); }
+.splash-logo span { color: var(--accent-blue); }
+
+#authWelcomeOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-main);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 40px 24px calc(env(safe-area-inset-bottom) + 30px) 24px;
+  text-align: center;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+#authWelcomeOverlay.visible { opacity: 1; visibility: visible; pointer-events: auto; }
+.auth-brand-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: 100%;
+  max-width: 380px;
+}
+.auth-logo { font-size: 48px; font-weight: 700; letter-spacing: -0.05em; color: var(--text-primary); margin-bottom: 8px; }
+.auth-logo span { color: var(--accent-blue); }
+.auth-tagline { font-size: 14.5px; color: var(--text-secondary); margin-bottom: 36px; line-height: 1.5; }
+.auth-forms-container { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+.auth-panel { display: none; width: 100%; flex-direction: column; gap: 12px; animation: fadeInScale 0.2s ease; }
+.auth-panel.active { display: flex; }
+

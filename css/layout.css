@@ -1,0 +1,20 @@
+/* ------------------------------------------------------------------------- */
+/* Main y Contenedor Central                                                */
+/* ------------------------------------------------------------------------- */
+main {
+  max-width: 470px;
+  margin: auto;
+  min-height: calc(100vh - 120px);
+  background: var(--bg-main);
+  margin-top: calc(54px + env(safe-area-inset-top));
+}
+main > div { display: none !important; padding: 16px; content-visibility: auto; }
+main > div.active { display: block !important; }
+#feed.active, #profile.active, #publicprofile.active, #messagesPage.active,
+#chatRoomPage.active, #chatDetailsPage.active, #chatSubSettingsPage.active,
+#menuSectionPage.active, #menuConfigPage.active, #menuPrivacyPage.active,
+#menuNotifPage.active, #menuActivityPage.active, #menuSavedPage.active,
+#menuHelpPage.active, #menuAccountsPage.active, #explore.active {
+  padding: 0 !important;
+}
+

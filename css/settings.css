@@ -1,0 +1,210 @@
+/* ------------------------------------------------------------------------- */
+/* Modales de Edición, Confirmación y Destacadas                             */
+/* ------------------------------------------------------------------------- */
+#editProfileModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 20px) 16px;
+}
+.edit-modal-card {
+  width: 100%;
+  max-width: 430px;
+  margin: auto;
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow-float);
+}
+.edit-modal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--border-light); }
+.edit-photos-row { display: flex; align-items: center; justify-content: center; padding: 6px 0 2px 0; }
+.edit-photo-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+.edit-photo-circle { width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: var(--border-light); border: 2px solid var(--border-medium); display: grid; place-items: center; position: relative; }
+.edit-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+#highlightModal, #addToHighlightModal, #logoutConfirmModal, #iosInstallModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#highlightModal, #addToHighlightModal { z-index: 650; }
+#logoutConfirmModal { z-index: 700; }
+#iosInstallModal { z-index: 750; }
+
+.highlight-modal-card {
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-float);
+}
+.confirm-card {
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  box-shadow: var(--shadow-float);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Pantallas de Menú y Ajustes Fullscreen                                   */
+/* ------------------------------------------------------------------------- */
+.fullscreen-menu-view {
+  display: none;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg-main);
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  animation: slideInMenu 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fullscreen-menu-view.active { display: flex !important; }
+.menu-section-header {
+  padding: calc(env(safe-area-inset-top) + 12px) 18px 12px 18px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(251, 248, 252, 0.90);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.menu-section-content {
+  flex: 1;
+  padding: 12px 18px calc(env(safe-area-inset-bottom) + 24px) 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-width: 470px;
+  width: 100%;
+  margin: 0 auto;
+}
+.menu-list-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--bg-container-lowest);
+  border: 1px solid var(--border-light);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.1s;
+  margin-bottom: 6px;
+  text-align: left;
+}
+.menu-list-btn:active { background: var(--bg-subtle); transform: scale(0.99); }
+.menu-list-left { display: flex; align-items: center; gap: 14px; }
+.menu-list-left svg { width: 20px; height: 20px; color: var(--text-secondary); flex-shrink: 0; }
+.menu-list-chevron { width: 18px; height: 18px; color: var(--text-muted); }
+.menu-list-btn.danger { color: var(--accent-red); border-color: rgba(186, 26, 26, 0.2); background: rgba(186, 26, 26, 0.04); margin-top: 12px; }
+.menu-list-btn.danger svg { color: var(--accent-red); }
+.menu-list-btn.pwa-install { color: var(--accent-blue); border-color: rgba(29, 78, 216, 0.25); background: rgba(29, 78, 216, 0.04); }
+.menu-list-btn.pwa-install svg { color: var(--accent-blue); }
+
+.settings-group { padding: 16px 0; border-bottom: 1px solid var(--border-light); }
+.settings-group-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0 0 12px 0; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; gap: 12px; }
+.settings-row-info { flex: 1; }
+.settings-row-title { font-size: 14px; font-weight: 500; color: var(--text-primary); margin: 0; }
+.settings-row-desc { font-size: 12px; color: var(--text-secondary); margin: 2px 0 0 0; }
+
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border-medium); border-radius: 24px; transition: 0.2s; }
+.toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #ffffff; border-radius: 50%; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+input:checked + .toggle-slider { background: var(--accent-blue); }
+input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+.ios-install-steps { display: flex; flex-direction: column; gap: 12px; text-align: left; margin: 6px 0; }
+.ios-step-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.4;
+}
+.ios-step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Drawer de Seguidores / Seguidos (Settings Overlay)                       */
+/* ------------------------------------------------------------------------- */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 200;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.settings-overlay.open { display: block; opacity: 1; }
+.settings-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-main);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  border-top: 1px solid var(--border-light);
+  z-index: 201;
+  padding: 16px 18px calc(env(safe-area-inset-bottom) + 24px) 18px;
+  max-width: 470px;
+  margin: auto;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
+}
+.settings-handle { width: 36px; height: 4px; background: var(--border-medium); border-radius: 2px; margin: 0 auto 16px auto; }

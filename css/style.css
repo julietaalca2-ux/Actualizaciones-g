@@ -719,13 +719,45 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
   justify-content: space-between; 
   color: #ffffff; 
   position: relative; 
-  z-index: 2; 
+  z-index: 4; 
   padding: 0 4px; 
 }
 .story-user-info { display: flex; align-items: center; gap: 8px; }
 .story-user-info .story-avatar-container { width: 34px; height: 34px; margin: 0; }
 .story-username-text { font-size: 13px; font-weight: 600; color: #ffffff; }
 .story-time-text { font-size: 11px; color: #a1a1aa; margin-left: 6px; }
+#storyViewer .story-top-bar button[onclick="closeStoryViewer()"] {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin-right: -4px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: #ffffff;
+  font-size: 23px;
+  line-height: 1;
+  font-weight: 400;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  position: relative;
+  z-index: 4;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+}
+#storyViewer .story-top-bar button[onclick="closeStoryViewer()"]:active {
+  transform: scale(0.9);
+  opacity: 0.7;
+}
 
 .story-content-area {
   flex: 1;

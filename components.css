@@ -1,0 +1,180 @@
+/* ------------------------------------------------------------------------- */
+/* Formularios y Botones                                                    */
+/* ------------------------------------------------------------------------- */
+textarea, .field {
+  width: 100%;
+  background: var(--bg-container-lowest);
+  color: var(--text-primary);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font: inherit;
+  margin-top: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+textarea:focus, .field:focus { 
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-subtle);
+}
+
+textarea { height: 110px; resize: none; }
+
+.primary {
+  width: 100%;
+  padding: 13px 18px;
+  background: var(--text-primary);
+  color: #ffffff;
+  border: 0;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+.primary:hover { opacity: 0.92; }
+.primary:active { transform: scale(0.97); }
+
+.secondary {
+  background: var(--bg-container-lowest);
+  border: 1px solid var(--border-medium);
+  color: var(--text-primary);
+  padding: 10px 16px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.secondary:active { background: var(--bg-muted); transform: scale(0.97); }
+
+.danger-btn {
+  width: 100%;
+  padding: 13px 18px;
+  background: rgba(186, 26, 26, 0.08);
+  color: var(--accent-red);
+  border: 1px solid rgba(186, 26, 26, 0.2);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.danger-btn:active { background: rgba(186, 26, 26, 0.16); }
+
+.status { 
+  font-size: 13px; 
+  color: var(--accent-blue); 
+  margin: 10px 0; 
+  overflow-wrap: anywhere; 
+  text-align: center; 
+}
+.muted { color: var(--text-secondary); font-size: 13px; }
+.hidden-file { display: none; }
+
+.modal-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 10px;
+}
+.modal-close-btn { padding: 4px 10px; font-size: 12px; }
+.field-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.grid-empty-msg {
+  grid-column: span 3;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 50px 20px;
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Animaciones Clave                                                        */
+/* ------------------------------------------------------------------------- */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideUpModal {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes slideTabFromRight {
+  from { opacity: 0.35; transform: translateX(36px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideTabFromLeft {
+  from { opacity: 0.35; transform: translateX(-36px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulseLoader {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+@keyframes splashPulse {
+  from { transform: scale(0.97); opacity: 0.88; }
+  to { transform: scale(1.03); opacity: 1; }
+}
+@keyframes slideInMenu {
+  from { transform: translateX(100%); opacity: 0.8; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+main > div.swipe-enter-right {
+  animation: slideTabFromRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+main > div.swipe-enter-left {
+  animation: slideTabFromLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Control de Visibilidad de Modales */
+#postDetailModal, #editProfileModal, #storyViewer, #cameraModal,
+#logoutConfirmModal, #followListModal, #highlightModal,
+#highlightViewer, #addToHighlightModal, #iosInstallModal {
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+#postDetailModal.active, #editProfileModal.active, #storyViewer.active,
+#cameraModal.active, #logoutConfirmModal.active, #followListModal.open,
+#highlightModal.active, #highlightViewer.active, #addToHighlightModal.active,
+#iosInstallModal.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+#postDetailModal.active .post-modal-card,
+#editProfileModal.active .edit-modal-card,
+#logoutConfirmModal.active .confirm-card,
+#highlightModal.active .highlight-modal-card,
+#addToHighlightModal.active .highlight-modal-card,
+#iosInstallModal.active .highlight-modal-card {
+  animation: fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+#followListModal.open .settings-drawer {
+  animation: slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+button, .story, .post-action-btn, .chat-action-pill, .menu-list-btn,
+.explore-grid-item, .ig-grid-item, .profile-tab-btn, .highlight-item {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease, background-color 0.15s ease;
+}
+button:active, .post-action-btn:active, .story:active, .highlight-item:active {
+  transform: scale(0.95);
+}
+
+.activity-empty {
+  animation: pulseLoader 1.6s ease-in-out infinite;
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+

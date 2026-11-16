@@ -1,0 +1,66 @@
+/* ========================================================================= */
+/* ÖG. — SOCIAL DESIGN SYSTEM & STYLESHEET (NORDIC MINIMALISM)              */
+/* ========================================================================= */
+
+
+/* ========================================================================= */
+/* 1. VARIABLES Y BASE                                                       */
+/* ========================================================================= */
+:root {
+  /* Paleta Editorial Nórdica */
+  --bg-main: #fbf8fc;
+  --bg-subtle: #f6f2f7;
+  --bg-muted: #f0edf1;
+  --bg-container-lowest: #ffffff;
+  --bg-bubble-rx: #f0edf1;
+  
+  --text-primary: #1b1b1f;
+  --text-body: #2d2d32;
+  --text-secondary: #57575e;
+  --text-muted: #79767d;
+  
+  --border-light: rgba(0, 0, 0, 0.06);
+  --border-medium: rgba(0, 0, 0, 0.12);
+  --border-subtle: #e5e1e6;
+  
+  /* Azul de Firma ÖG (Zafiro Nórdico) */
+  --accent-blue: #1d4ed8;
+  --accent-blue-dark: #1e40af;
+  --accent-blue-subtle: rgba(29, 78, 216, 0.08);
+  --accent-red: #ba1a1a;
+  --accent-green: #22c55e;
+  
+  /* Radios & Elevaciones */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  --shadow-soft: 0 4px 20px -2px rgba(24, 24, 27, 0.05);
+  --shadow-float: 0 16px 36px -6px rgba(24, 24, 27, 0.12);
+}
+
+* { 
+  box-sizing: border-box; 
+  -webkit-tap-highlight-color: transparent; 
+}
+
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding-bottom: 95px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  scrollbar-width: none !important;
+  letter-spacing: -0.011em;
+}
+

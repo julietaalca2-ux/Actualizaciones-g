@@ -39,6 +39,18 @@ function hideSplashScreen() {
  }
 }
 
+
+// Acceso con Google: Supabase administra el flujo OAuth y la sesión.
+async function signInWithGoogle() {
+ status('authOverlayStatus', 'Conectando con Google...');
+ const redirectTo = window.location.origin + window.location.pathname;
+ const { error } = await db.auth.signInWithOAuth({
+  provider: 'google',
+  options: { redirectTo }
+ });
+ if (error) status('authOverlayStatus', 'No se pudo iniciar con Google: ' + error.message);
+}
+
 async function executeSignUp() {
  const email = document.getElementById('regEmail').value.trim();
  const password = document.getElementById('regPassword').value;

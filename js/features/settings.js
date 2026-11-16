@@ -47,6 +47,8 @@ function submitHelpReport() {
 
 function populateAccountCenter() {
  if (!currentUser) return;
+ refreshGoogleIdentityUI();
+ document.getElementById('googleLinkStatus').textContent = '';
  document.getElementById('passwordStatus').textContent = '';
  document.getElementById('newPasswordInput').value = '';
 }
@@ -64,3 +66,39 @@ async function updateUserPassword() {
  status('passwordStatus', '¡Contraseña actualizada correctamente!');
 }
 
+
+
+// Vincula Google a la sesión Ög actual. No busca ni fusiona cuentas por correo.
+function hasGoogleIdentity(user) {
+ return !!user?.identities?.some(identity => identity.provider === 'google');
+}
+
+function refreshGoogleIdentityUI() {
+ const statusEl = document.getElementById('googleIdentityStatus');
+ const button = document.getElementById('googleLinkButton');
+ if (!statusEl || !button) return;
+ const linked = hasGoogleIdentity(currentUser);
+ statusEl.textContent = linked ? 'Google ya está vinculado a esta cuenta de Ög.' : 'Todavía no vinculaste una cuenta de Google.';
+ button.textContent = linked ? 'Cuenta de Google vinculada' : 'Vincular cuenta de Google';
+ button.disabled = linked;
+}
+
+async function linkGoogleAccount() {
+ const statusEl = document.getElementById('googleLinkStatus');
+ if (!currentUser) {
+  if (statusEl) statusEl.textContent = 'Iniciá sesión en Ög antes de vincular Google.';
+  return;
+ }
+ if (hasGoogleIdentity(currentUser)) {
+  refreshGoogleIdentityUI();
+  if (statusEl) statusEl.textContent = 'Esta cuenta ya tiene Google vinculado.';
+  return;
+ }
+ if (statusEl) statusEl.textContent = 'Redirigiendo a Google para autorizar la vinculación...';
+ const redirectTo = window.location.origin + window.location.pathname;
+ const { error } = await db.auth.linkIdentity({
+  provider: 'google',
+  options: { redirectTo }
+ });
+ if (error && statusEl) statusEl.textContent = 'No se pudo vincular Google: ' + error.message;
+}

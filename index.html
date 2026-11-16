@@ -43,6 +43,7 @@
         <div id="authWelcomePanel" class="auth-panel active">
           <button class="primary" onclick="switchAuthSubView('signup')">Crear cuenta</button>
           <button class="secondary" onclick="switchAuthSubView('signin')">Iniciar sesión</button>
+          <button class="google-auth-button" onclick="signInWithGoogle()"><span class="google-g" aria-hidden="true">G</span> Continuar con Google</button>
           <button class="secondary" id="authInstallAndroidBtn" style="display:none;" onclick="triggerAndroidInstall()">Instalar ÖG</button>
           <button class="secondary" id="authInstallIosBtn" style="display:none;" onclick="openIosInstallModal()">Cómo instalar ÖG</button>
         </div>
@@ -57,6 +58,7 @@
           <input class="field" id="loginEmail" type="email" placeholder="Correo electrónico" autocomplete="email">
           <input class="field" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password">
           <button class="primary" onclick="executeSignIn()">Iniciar sesión</button>
+          <button class="google-auth-button" onclick="signInWithGoogle()"><span class="google-g" aria-hidden="true">G</span> Continuar con Google</button>
           <button class="secondary" onclick="switchAuthSubView('welcome')">Volver</button>
         </div>
         <p id="authOverlayStatus" class="status"></p>
@@ -651,6 +653,14 @@
         <strong style="font-size:16px;color:var(--text-primary);">Centro de cuentas</strong>
       </div>
       <div class="menu-section-content">
+        <div class="account-link-card">
+          <div class="account-link-copy">
+            <strong>Cuenta de Google</strong>
+            <span id="googleIdentityStatus">Comprobando estado...</span>
+          </div>
+          <button class="secondary" id="googleLinkButton" onclick="linkGoogleAccount()">Vincular cuenta de Google</button>
+          <p id="googleLinkStatus" class="status" aria-live="polite"></p>
+        </div>
         <input class="field" id="newPasswordInput" type="password" placeholder="Nueva contraseña">
         <button class="primary" style="margin-top:12px" onclick="updateUserPassword()">Actualizar contraseña</button>
         <p id="passwordStatus" class="status"></p>

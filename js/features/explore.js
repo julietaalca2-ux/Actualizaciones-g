@@ -1,9 +1,11 @@
+
 /* Depende de: config.js (db); state.js (currentUser, profilesCache, searchTimer);
    utils.js (createAvatarNode)
    En tiempo de ejecución usa funciones de otros módulos: openPostDetail (feed.js),
    openPublicProfile (profile.js)
    Expone: loadExploreGrid, handleExploreSearchFocus, handleExploreSearchInput,
    resetExploreSearch, switchSearchTab, executeAdvancedSearch */
+
 async function loadExploreGrid() {
  const grid = document.getElementById('exploreGrid');
  const { data: posts } = await db.from('posts').select('*').order('created_at', { ascending: false });
@@ -77,7 +79,7 @@ function switchSearchTab(tabKey, btnElement) {
 async function executeAdvancedSearch(queryText) {
  const query = queryText.toLowerCase();
 
- const { data: profilesData } = await db.from('profiles')
+ const { data: profilesData } = await db.from('og_profiles')
   .select('id, username, display_name, avatar_url')
   .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
   .limit(15);
@@ -135,4 +137,3 @@ async function executeAdvancedSearch(queryText) {
   forYouContainer.replaceChildren(postsFragment);
  }
 }
-

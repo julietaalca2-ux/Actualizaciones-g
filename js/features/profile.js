@@ -142,7 +142,7 @@ async function saveFullProfile() {
 
   // ACTUALIZAR PERFIL EN SUPABASE
   const { data, error } = await db
-   .from('profiles')
+   .from('og_profiles')
    .update({
     display_name,
     username,
@@ -304,7 +304,7 @@ async function openPublicProfile(userId) {
   return;
  }
 
- const { data: profile } = await db.from('profiles')
+ const { data: profile } = await db.from('og_profiles')
   .select('*')
   .eq('id', userId)
   .single();
@@ -459,7 +459,7 @@ async function renderUsersInFollowModal(userIds) {
  const missing = userIds.filter(id => !profilesCache[id]);
 
  if (missing.length > 0) {
-  const { data: profs } = await db.from('profiles')
+  const { data: profs } = await db.from('og_profiles')
    .select('id, username, display_name, avatar_url')
    .in('id', missing);
 

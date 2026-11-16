@@ -1,3 +1,4 @@
+
 /* Depende de: config.js (db); state.js (currentUser, myProfile, profilesCache, feedPage,
    FEED_PAGE_SIZE, feedLoading, feedHasMore, loadedPostIds, cachedFeedPosts, isPublishing,
    postImageBlob, visitorId); utils.js (status, formatDate, setPreviewBlobUrl,
@@ -9,6 +10,7 @@
    loadPostComments, quickComment, handlePostImageSelect, removePostImage, publish,
    openPostDetail, closePostDetailModal, getSavedPostIds, toggleSavePost,
    fetchAndRenderSavedGrid, loadSavedPostsGrid, loadSavedPostsProfileGrid */
+
 async function loadInitialPosts() {
  feedPage = 0;
  feedHasMore = true;
@@ -67,7 +69,7 @@ async function fetchAndAppendPosts(isInitial) {
 
   const missingUserIds = [...new Set(uniqueNewPosts.map(p => p.user_id))].filter(id => !profilesCache[id]);
   if (missingUserIds.length > 0) {
-   const { data: newProfiles } = await db.from('profiles').select('id, username, display_name, avatar_url').in('id', missingUserIds);
+   const { data: newProfiles } = await db.from('og_profiles').select('id, username, display_name, avatar_url').in('id', missingUserIds);
    (newProfiles || []).forEach(p => profilesCache[p.id] = p);
   }
 
@@ -245,7 +247,7 @@ async function loadPostComments(postId, container) {
 
  const missing = [...new Set(comments.map(c => c.user_id))].filter(id => !profilesCache[id]);
  if (missing.length > 0) {
-  const { data: profs } = await db.from('profiles').select('id, username, display_name, avatar_url').in('id', missing);
+  const { data: profs } = await db.from('og_profiles').select('id, username, display_name, avatar_url').in('id', missing);
   (profs || []).forEach(p => profilesCache[p.id] = p);
  }
 
@@ -420,4 +422,3 @@ async function loadSavedPostsGrid() {
 async function loadSavedPostsProfileGrid() {
  await fetchAndRenderSavedGrid('savedPostsGridProfile', 'Solo tú puedes ver lo que has guardado.');
 }
-

@@ -1,37 +1,41 @@
 /* ========================================================================= */
 /* ÖG. — SOCIAL DESIGN SYSTEM & STYLESHEET (NORDIC MINIMALISM)              */
+/* «Sé parte de lo auténtico»                                               */
 /* ========================================================================= */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* ========================================================================= */
-/* 1. VARIABLES Y BASE                                                       */
+/* 1. TOKENS, VARIABLES & RESET GLOBAL                                       */
 /* ========================================================================= */
 :root {
-  /* Paleta Editorial Nórdica */
+  /* Lienzo Cerámico Nórdico */
   --bg-main: #fbf8fc;
   --bg-subtle: #f6f2f7;
   --bg-muted: #f0edf1;
   --bg-container-lowest: #ffffff;
   --bg-bubble-rx: #f0edf1;
   
+  /* Escala Tipográfica de Contraste Suave */
   --text-primary: #1b1b1f;
   --text-body: #2d2d32;
   --text-secondary: #57575e;
   --text-muted: #79767d;
   
+  /* Líneas Finas y Separadores Editoriales */
   --border-light: rgba(0, 0, 0, 0.06);
   --border-medium: rgba(0, 0, 0, 0.12);
   --border-subtle: #e5e1e6;
   
-  /* Azul de Firma ÖG (Zafiro Nórdico) */
+  /* Acento de Identidad ÖG: Zafiro Nórdico */
   --accent-blue: #1d4ed8;
   --accent-blue-dark: #1e40af;
   --accent-blue-subtle: rgba(29, 78, 216, 0.08);
+  --accent-blue-glow: rgba(29, 78, 216, 0.22);
   --accent-red: #ba1a1a;
   --accent-green: #22c55e;
   
-  /* Radios & Elevaciones */
+  /* Radios y Elevaciones Sutiles */
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
@@ -45,6 +49,13 @@
   -webkit-tap-highlight-color: transparent; 
 }
 
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 ::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
@@ -53,7 +64,6 @@
 }
 
 body {
-  margin: 0;
   background: var(--bg-main);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -62,12 +72,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   scrollbar-width: none !important;
-  letter-spacing: -0.011em;
+  letter-spacing: -0.012em;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Formularios y Botones                                                    */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 2. FORMULARIOS, INPUTS Y BOTONES                                         */
+/* ========================================================================= */
 textarea, .field {
   width: 100%;
   background: var(--bg-container-lowest);
@@ -79,7 +89,7 @@ textarea, .field {
   margin-top: 6px;
   font-size: 14px;
   outline: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
 }
 
 textarea:focus, .field:focus { 
@@ -87,7 +97,10 @@ textarea:focus, .field:focus {
   box-shadow: 0 0 0 3px var(--accent-blue-subtle);
 }
 
-textarea { height: 110px; resize: none; }
+textarea { 
+  height: 110px; 
+  resize: none; 
+}
 
 .primary {
   width: 100%;
@@ -99,7 +112,7 @@ textarea { height: 110px; resize: none; }
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  transition: transform 0.15s ease, opacity 0.15s ease;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 .primary:hover { opacity: 0.92; }
@@ -114,7 +127,7 @@ textarea { height: 110px; resize: none; }
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.1s ease;
 }
 .secondary:active { background: var(--bg-muted); transform: scale(0.97); }
 
@@ -150,7 +163,13 @@ textarea { height: 110px; resize: none; }
   padding-bottom: 10px;
 }
 .modal-close-btn { padding: 4px 10px; font-size: 12px; }
-.field-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.field-label { 
+  font-size: 11px; 
+  font-weight: 600; 
+  text-transform: uppercase; 
+  letter-spacing: 0.04em; 
+  color: var(--text-secondary);
+}
 .grid-empty-msg {
   grid-column: span 3;
   text-align: center;
@@ -159,9 +178,9 @@ textarea { height: 110px; resize: none; }
   font-size: 14px;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Animaciones Clave                                                        */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 3. ANIMACIONES Y TRANSICIONES CINEMÁTICAS                                */
+/* ========================================================================= */
 @keyframes fadeInScale {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
@@ -200,7 +219,7 @@ main > div.swipe-enter-left {
   will-change: transform, opacity;
 }
 
-/* Control de Visibilidad de Modales */
+/* Modales y Overlays */
 #postDetailModal, #editProfileModal, #storyViewer, #cameraModal,
 #logoutConfirmModal, #followListModal, #highlightModal,
 #highlightViewer, #addToHighlightModal, #iosInstallModal {
@@ -245,9 +264,9 @@ button:active, .post-action-btn:active, .story:active, .highlight-item:active {
   font-size: 13.5px;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Splash y Bienvenida / Autenticación                                      */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 4. SPLASH SCREEN Y BIENVENIDA / AUTENTICACIÓN                            */
+/* ========================================================================= */
 #appSplashScreen {
   position: fixed;
   inset: 0;
@@ -270,7 +289,12 @@ button:active, .post-action-btn:active, .story:active, .highlight-item:active {
   justify-content: center;
   animation: splashPulse 1.2s ease-in-out infinite alternate;
 }
-.splash-logo { font-size: 56px; font-weight: 700; letter-spacing: -0.06em; color: var(--text-primary); }
+.splash-logo { 
+  font-size: 56px; 
+  font-weight: 700; 
+  letter-spacing: -0.06em; 
+  color: var(--text-primary); 
+}
 .splash-logo span { color: var(--accent-blue); }
 
 #authWelcomeOverlay {
@@ -299,16 +323,31 @@ button:active, .post-action-btn:active, .story:active, .highlight-item:active {
   width: 100%;
   max-width: 380px;
 }
-.auth-logo { font-size: 48px; font-weight: 700; letter-spacing: -0.05em; color: var(--text-primary); margin-bottom: 8px; }
+.auth-logo { 
+  font-size: 52px; 
+  font-weight: 700; 
+  letter-spacing: -0.05em; 
+  color: var(--text-primary); 
+  margin-bottom: 6px; 
+}
 .auth-logo span { color: var(--accent-blue); }
-.auth-tagline { font-size: 14.5px; color: var(--text-secondary); margin-bottom: 36px; line-height: 1.5; }
+.auth-tagline { 
+  font-size: 16px; 
+  font-weight: 500;
+  color: var(--text-secondary); 
+  margin-top: 14px;
+  margin-bottom: 38px; 
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  max-width: 290px;
+}
 .auth-forms-container { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
 .auth-panel { display: none; width: 100%; flex-direction: column; gap: 12px; animation: fadeInScale 0.2s ease; }
 .auth-panel.active { display: flex; }
 
-/* ------------------------------------------------------------------------- */
-/* Header Superior Fijo                                                      */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 5. HEADER SUPERIOR FIJO                                                   */
+/* ========================================================================= */
 header {
   height: 54px;
   padding: env(safe-area-inset-top) 18px 0 18px;
@@ -360,9 +399,9 @@ header {
 .icon:active { opacity: 0.6; transform: scale(0.92); }
 .icon svg { width: 22px; height: 22px; }
 
-/* ------------------------------------------------------------------------- */
-/* Main y Contenedor Central                                                */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 6. MAIN Y CONTENEDOR CENTRAL DE LA APLICACIÓN                            */
+/* ========================================================================= */
 main {
   max-width: 470px;
   margin: auto;
@@ -380,9 +419,9 @@ main > div.active { display: block !important; }
   padding: 0 !important;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Barra de Navegación Inferior (Floating Glassdock)                         */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 7. NAVEGACIÓN INFERIOR (FLOATING GLASS DOCK)                              */
+/* ========================================================================= */
 nav {
   position: fixed;
   bottom: 0;
@@ -465,9 +504,9 @@ nav button.active::after {
 nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-width: 2px; }
 .nav-avatar-ring img { width: 100%; height: 100%; object-fit: cover; }
 
-/* ------------------------------------------------------------------------- */
-/* Historias & Feed                                                         */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 8. HISTORIAS Y BANDEJA SUPERIOR                                          */
+/* ========================================================================= */
 .stories {
   display: flex;
   gap: 16px;
@@ -549,239 +588,9 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
   cursor: pointer;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Modal de Cámara                                                           */
-/* ------------------------------------------------------------------------- */
-#cameraModal {
-  position: fixed;
-  inset: 0;
-  background: #000000;
-  z-index: 400;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-.camera-screen-container {
-  position: absolute;
-  inset: 0;
-  background: transparent;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 20px) 16px;
-  pointer-events: none;
-}
-.camera-screen-container > * { pointer-events: auto; }
-.camera-video-fullscreen {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 1;
-  background: #000000;
-  transform-origin: center center;
-  will-change: transform;
-}
-#capturedImagePreview { z-index: 2; }
-.camera-top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #ffffff;
-  width: 100%;
-  max-width: 430px;
-  margin: 0 auto;
-}
-.camera-zoom-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  width: fit-content;
-  margin: 0 auto;
-}
-.camera-zoom-container input[type=range] {
-  -webkit-appearance: none;
-  width: 110px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-  outline: none;
-}
-.camera-zoom-container input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  cursor: pointer;
-}
-.camera-zoom-label { font-size: 11px; font-weight: 600; color: #ffffff; }
-.camera-bottom-ui {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  width: 100%;
-  max-width: 430px;
-  margin: 0 auto;
-}
-.capture-btn {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  background: transparent;
-  border: 4px solid #ffffff;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: transform 0.1s ease;
-}
-.capture-btn::after {
-  content: '';
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
-  background: #ffffff;
-  display: block;
-}
-.capture-btn:active { transform: scale(0.92); }
-.camera-actions-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0 24px;
-}
-.camera-gallery-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.8);
-  background: #27272a;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-.camera-gallery-icon img { width: 100%; height: 100%; object-fit: cover; }
-
-/* ------------------------------------------------------------------------- */
-/* Visor de Historias                                                       */
-/* ------------------------------------------------------------------------- */
-#storyViewer, #highlightViewer {
-  position: fixed;
-  inset: 0;
-  background: #000000;
-  z-index: 300;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px) 12px;
-  touch-action: pan-y;
-}
-.story-progress-bars {
-  display: flex;
-  gap: 4px;
-  width: 100%;
-  padding: 0 4px 8px 4px;
-  position: relative;
-  z-index: 3;
-}
-.story-progress-segment {
-  flex: 1;
-  height: 2.5px;
-  background: rgba(255, 255, 255, 0.32);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.story-progress-fill {
-  height: 100%;
-  width: 0%;
-  background: #ffffff;
-  transition: width 0.2s ease;
-}
-.story-progress-segment.completed .story-progress-fill,
-.story-progress-segment.active .story-progress-fill {
-  width: 100%;
-}
-.story-top-bar { 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
-  color: #ffffff; 
-  position: relative; 
-  z-index: 2; 
-  padding: 0 4px; 
-}
-.story-user-info { display: flex; align-items: center; gap: 8px; }
-.story-user-info .story-avatar-container { width: 34px; height: 34px; margin: 0; }
-.story-username-text { font-size: 13px; font-weight: 600; color: #ffffff; }
-.story-time-text { font-size: 11px; color: #a1a1aa; margin-left: 6px; }
-
-.story-content-area {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  margin: 8px 0;
-  overflow: hidden;
-  border-radius: 16px;
-  background: #121214;
-  user-select: none;
-}
-.story-content-area img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-.story-bottom-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 8px;
-  width: 100%;
-  max-width: 450px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 2;
-}
-.story-reply-input {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: var(--radius-full);
-  padding: 10px 16px;
-  color: #ffffff;
-  font-size: 13.5px;
-  outline: none;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-.story-reply-input::placeholder { color: rgba(255, 255, 255, 0.65); }
-.story-action-icon-btn {
-  background: none;
-  border: 0;
-  color: #ffffff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  transition: transform 0.1s ease;
-}
-.story-action-icon-btn:active { transform: scale(0.85); }
-.story-action-icon-btn svg { width: 26px; height: 26px; stroke: #ffffff; fill: none; stroke-width: 2; }
-.story-action-icon-btn.liked svg { fill: var(--accent-red); stroke: var(--accent-red); }
-
-/* ------------------------------------------------------------------------- */
-/* Publicaciones y Feed                                                     */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 9. PUBLICACIONES Y FEED                                                   */
+/* ========================================================================= */
 .post {
   background: var(--bg-container-lowest);
   border-bottom: 1px solid var(--border-light);
@@ -789,11 +598,29 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
   content-visibility: auto;
   contain-intrinsic-size: 500px;
 }
-.posthead { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.posthead { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  padding: 12px 16px; 
+}
+.posthead-user-wrap { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  cursor: pointer; 
+}
 .posthead .story-avatar-container { width: 34px; height: 34px; margin: 0; flex-shrink: 0; }
-.username { font-weight: 600; font-size: 13.5px; color: var(--text-primary); }
+.username { 
+  font-weight: 600; 
+  font-size: 13.5px; 
+  color: var(--text-primary); 
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .time { color: var(--text-muted); font-size: 11px; margin-top: 1px; }
-.postimage { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: var(--bg-subtle); }
+.postimage { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: var(--bg-subtle); display: block; }
 .posttext { 
   font-size: 13.5px; 
   line-height: 1.5; 
@@ -829,6 +656,7 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 .comment-input { flex: 1; background: none; border: 0; color: var(--text-primary); font-size: 13px; outline: none; }
 .comment-input::placeholder { color: var(--text-muted); }
 .comment-send-btn { background: none; border: 0; color: var(--accent-blue); font-weight: 600; font-size: 13px; cursor: pointer; padding: 4px; }
+
 #posts:empty:after {
   content: "Todavía no hay publicaciones. ¡Sé el primero en compartir un espacio!";
   display: block;
@@ -838,9 +666,9 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
   font-size: 13.5px;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Modal Detalle de Publicación                                              */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 10. MODAL DETALLE DE PUBLICACIÓN                                          */
+/* ========================================================================= */
 #postDetailModal {
   position: fixed;
   inset: 0;
@@ -874,9 +702,9 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 }
 .post-modal-body { overflow-y: auto; flex: 1; }
 
-/* ------------------------------------------------------------------------- */
-/* Crear Publicación                                                        */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 11. CREAR PUBLICACIÓN (#create)                                           */
+/* ========================================================================= */
 .create-card {
   background: var(--bg-container-lowest);
   border: 1px solid var(--border-light);
@@ -902,9 +730,9 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 .create-media-dropzone:active { background: var(--bg-bubble-rx); border-color: var(--accent-blue); }
 .create-media-dropzone svg { width: 32px; height: 32px; color: var(--text-secondary); }
 
-/* ------------------------------------------------------------------------- */
-/* Explorar y Búsqueda                                                      */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 12. EXPLORAR Y BUSCADOR                                                   */
+/* ========================================================================= */
 .explore-top-bar {
   padding: 12px 18px;
   position: sticky;
@@ -1001,9 +829,9 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 }
 .explore-grid-badge svg { width: 12px; height: 12px; fill: #ffffff; }
 
-/* ------------------------------------------------------------------------- */
-/* Chat y Mensajes Directos                                                 */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 13. MENSAJES PRIVADOS Y CHAT DIRECTO                                     */
+/* ========================================================================= */
 .dm-conv-item {
   display: flex;
   align-items: center;
@@ -1224,9 +1052,9 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 .chat-action-pill:active { background: var(--bg-bubble-rx); }
 .chat-action-pill svg { width: 20px; height: 20px; color: var(--accent-blue); }
 
-/* ------------------------------------------------------------------------- */
-/* Perfil de Usuario & Historias Destacadas                                 */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 14. PERFIL DE USUARIO, DESTACADAS Y CUENTAS VERIFICADAS                  */
+/* ========================================================================= */
 .profile-header-modern { padding: 20px 18px 12px 18px; background: var(--bg-main); }
 .profile-top-info-row { display: flex; align-items: center; gap: 20px; margin-bottom: 14px; }
 .profile-avatar-container-mod {
@@ -1254,7 +1082,15 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 .profile-stat-num { font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
 .profile-stat-label { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; font-weight: 400; }
 .profile-bio-area { margin-bottom: 16px; text-align: left; }
-.profile-display-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0 0 2px 0; display: flex; align-items: center; gap: 6px; }
+.profile-display-name { 
+  font-size: 15px; 
+  font-weight: 700; 
+  color: var(--text-primary); 
+  margin: 0 0 2px 0; 
+  display: flex; 
+  align-items: center; 
+  gap: 6px; 
+}
 .profile-pronouns-tag { font-size: 12px; color: var(--text-secondary); font-weight: normal; }
 .profile-username-tag { font-size: 13px; color: var(--text-muted); margin: 0 0 6px 0; font-weight: 400; }
 .profile-bio-text { font-size: 13.5px; line-height: 1.45; color: var(--text-body); margin: 0 0 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -1275,6 +1111,20 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 }
 .profile-action-buttons-row button:active { transform: scale(0.97); background: var(--bg-muted); }
 .profile-action-buttons-row button.primary-action { background: var(--text-primary); color: #ffffff; border-color: var(--text-primary); }
+
+/* Insignia y Verificación Nórdica */
+.verified-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-blue);
+  vertical-align: middle;
+}
+.verified-badge svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
 
 .highlights-scroll-container {
   display: flex;
@@ -1354,81 +1204,239 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 }
 .pinned-post-badge svg { width: 10px; height: 10px; fill: #ffffff; }
 
-/* ------------------------------------------------------------------------- */
-/* Modales de Edición, Confirmación y Destacadas                             */
-/* ------------------------------------------------------------------------- */
-#editProfileModal {
+/* ========================================================================= */
+/* 15. MODAL DE CÁMARA (#cameraModal)                                        */
+/* ========================================================================= */
+#cameraModal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  z-index: 600;
+  background: #000000;
+  z-index: 400;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 20px) 16px;
+  justify-content: space-between;
 }
-.edit-modal-card {
+.camera-screen-container {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 20px) 16px;
+  pointer-events: none;
+}
+.camera-screen-container > * { pointer-events: auto; }
+.camera-video-fullscreen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+  background: #000000;
+  transform-origin: center center;
+  will-change: transform;
+}
+#capturedImagePreview { z-index: 2; }
+.camera-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
   width: 100%;
   max-width: 430px;
-  margin: auto;
-  background: var(--bg-main);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: var(--shadow-float);
+  margin: 0 auto;
 }
-.edit-modal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--border-light); }
-.edit-photos-row { display: flex; align-items: center; justify-content: center; padding: 6px 0 2px 0; }
-.edit-photo-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
-.edit-photo-circle { width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: var(--border-light); border: 2px solid var(--border-medium); display: grid; place-items: center; position: relative; }
-.edit-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
-
-#highlightModal, #addToHighlightModal, #logoutConfirmModal, #iosInstallModal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+.camera-zoom-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  width: fit-content;
+  margin: 0 auto;
 }
-#highlightModal, #addToHighlightModal { z-index: 650; }
-#logoutConfirmModal { z-index: 700; }
-#iosInstallModal { z-index: 750; }
-
-.highlight-modal-card {
-  background: var(--bg-main);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  padding: 24px 20px;
-  width: 100%;
-  max-width: 380px;
+.camera-zoom-container input[type=range] {
+  -webkit-appearance: none;
+  width: 110px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  outline: none;
+}
+.camera-zoom-container input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+}
+.camera-zoom-label { font-size: 11px; font-weight: 600; color: #ffffff; }
+.camera-bottom-ui {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  box-shadow: var(--shadow-float);
-}
-.confirm-card {
-  background: var(--bg-main);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  padding: 24px 20px;
+  align-items: center;
+  gap: 20px;
   width: 100%;
-  max-width: 340px;
-  text-align: center;
-  box-shadow: var(--shadow-float);
+  max-width: 430px;
+  margin: 0 auto;
 }
+.capture-btn {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: transparent;
+  border: 4px solid #ffffff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.1s ease;
+}
+.capture-btn::after {
+  content: '';
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: block;
+}
+.capture-btn:active { transform: scale(0.92); }
+.camera-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 24px;
+}
+.camera-gallery-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  background: #27272a;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.camera-gallery-icon img { width: 100%; height: 100%; object-fit: cover; }
 
-/* ------------------------------------------------------------------------- */
-/* Pantallas de Menú y Ajustes Fullscreen                                   */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 16. VISOR DE HISTORIAS (#storyViewer & #highlightViewer)                  */
+/* ========================================================================= */
+#storyViewer, #highlightViewer {
+  position: fixed;
+  inset: 0;
+  background: #000000;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px) 12px;
+  touch-action: pan-y;
+}
+.story-progress-bars {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  padding: 0 4px 8px 4px;
+  position: relative;
+  z-index: 3;
+}
+.story-progress-segment {
+  flex: 1;
+  height: 2.5px;
+  background: rgba(255, 255, 255, 0.32);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.story-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #ffffff;
+  transition: width 0.2s ease;
+}
+.story-progress-segment.completed .story-progress-fill,
+.story-progress-segment.active .story-progress-fill {
+  width: 100%;
+}
+.story-top-bar { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  color: #ffffff; 
+  position: relative; 
+  z-index: 2; 
+  padding: 0 4px; 
+}
+.story-user-info { display: flex; align-items: center; gap: 8px; }
+.story-user-info .story-avatar-container { width: 34px; height: 34px; margin: 0; }
+.story-username-text { font-size: 13px; font-weight: 600; color: #ffffff; }
+.story-time-text { font-size: 11px; color: #a1a1aa; margin-left: 6px; }
+
+.story-content-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #121214;
+  user-select: none;
+}
+.story-content-area img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.story-bottom-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px;
+  width: 100%;
+  max-width: 450px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+.story-reply-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-full);
+  padding: 10px 16px;
+  color: #ffffff;
+  font-size: 13.5px;
+  outline: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.story-reply-input::placeholder { color: rgba(255, 255, 255, 0.65); }
+.story-action-icon-btn {
+  background: none;
+  border: 0;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  transition: transform 0.1s ease;
+}
+.story-action-icon-btn:active { transform: scale(0.85); }
+.story-action-icon-btn svg { width: 26px; height: 26px; stroke: #ffffff; fill: none; stroke-width: 2; }
+.story-action-icon-btn.liked svg { fill: var(--accent-red); stroke: var(--accent-red); }
+
+/* ========================================================================= */
+/* 17. PANTALLAS DE MENÚ, AJUSTES Y NOTIFICACIONES                           */
+/* ========================================================================= */
 .fullscreen-menu-view {
   display: none;
   flex-direction: column;
@@ -1505,6 +1513,97 @@ nav button.active .nav-avatar-ring { border-color: var(--accent-blue); border-wi
 input:checked + .toggle-slider { background: var(--accent-blue); }
 input:checked + .toggle-slider:before { transform: translateX(20px); }
 
+/* Notificaciones Editoriales */
+.notification-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-container-lowest);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.notification-item:active { background: var(--bg-subtle); }
+.notification-avatar { width: 44px; height: 44px; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
+.notification-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.notification-text { font-size: 13px; color: var(--text-body); line-height: 1.4; flex: 1; }
+.notification-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.notification-preview-thumb { width: 44px; height: 44px; border-radius: var(--radius-sm); overflow: hidden; flex-shrink: 0; }
+.notification-preview-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ========================================================================= */
+/* 18. MODALES DE SISTEMA Y AJUSTES COMPACTOS                               */
+/* ========================================================================= */
+#editProfileModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 20px) 16px;
+}
+.edit-modal-card {
+  width: 100%;
+  max-width: 430px;
+  margin: auto;
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow-float);
+}
+.edit-modal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--border-light); }
+.edit-photos-row { display: flex; align-items: center; justify-content: center; padding: 6px 0 2px 0; }
+.edit-photo-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+.edit-photo-circle { width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: var(--border-light); border: 2px solid var(--border-medium); display: grid; place-items: center; position: relative; }
+.edit-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+#highlightModal, #addToHighlightModal, #logoutConfirmModal, #iosInstallModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#highlightModal, #addToHighlightModal { z-index: 650; }
+#logoutConfirmModal { z-index: 700; }
+#iosInstallModal { z-index: 750; }
+
+.highlight-modal-card {
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-float);
+}
+.confirm-card {
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  box-shadow: var(--shadow-float);
+}
+
 .ios-install-steps { display: flex; flex-direction: column; gap: 12px; text-align: left; margin: 6px 0; }
 .ios-step-row {
   display: flex;
@@ -1531,9 +1630,9 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
   flex-shrink: 0;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Drawer de Seguidores / Seguidos (Settings Overlay)                       */
-/* ------------------------------------------------------------------------- */
+/* ========================================================================= */
+/* 19. DRAWER DE SEGUIDORES Y SEGUIDOS                                       */
+/* ========================================================================= */
 .settings-overlay {
   position: fixed;
   inset: 0;
@@ -1564,3 +1663,4 @@ input:checked + .toggle-slider:before { transform: translateX(20px); }
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
 }
 .settings-handle { width: 36px; height: 4px; background: var(--border-medium); border-radius: 2px; margin: 0 auto 16px auto; }
+

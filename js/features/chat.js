@@ -1,3 +1,4 @@
+
 /* Depende de: config.js (db); state.js (currentUser, profilesCache, onlineUsersMap,
    activeConversationId, activeRecipientProfile, replyingToMessageId, replyingToSnippet,
    cachedConversationsList, dmSearchTimer); utils.js (formatDate, createAvatarNode,
@@ -8,6 +9,7 @@
    appendChatMessageNode, scrollToBottomChat, triggerReplyToMessage, cancelReply,
    sendChatMessage, openChatDetailsPage, toggleChatDetailsMenu, handleChatActionMenu,
    openChatRecipientProfile, triggerChatSearch, openMuteOptionsModal, openChatSubSettings */
+
 async function checkGlobalUnreadMessages() {
  if (!currentUser) return;
  const { data: parts } = await db.from('conversation_participants').select('conversation_id, last_read_at').eq('user_id', currentUser.id);
@@ -52,7 +54,7 @@ async function loadConversations() {
   const otherUserIds = [...new Set(Object.values(convMap).map(c => c.otherUserId).filter(Boolean))];
   const missing = otherUserIds.filter(id => !profilesCache[id]);
   if (missing.length > 0) {
-   const { data: profs } = await db.from('profiles').select('id, username, display_name, avatar_url').in('id', missing);
+   const { data: profs } = await db.from('og_profiles').select('id, username, display_name, avatar_url').in('id', missing);
    (profs || []).forEach(p => profilesCache[p.id] = p);
   }
 
@@ -125,7 +127,7 @@ async function searchUsersForChat() {
  if (val.length < 2) { resultBox.replaceChildren(); return; }
 
  dmSearchTimer = setTimeout(async () => {
-  const { data } = await db.from('profiles').select('id, username, display_name, avatar_url').ilike('username', '%' + val + '%').limit(10);
+  const { data } = await db.from('og_profiles').select('id, username, display_name, avatar_url').ilike('username', '%' + val + '%').limit(10);
   if (!data || !data.length) {
    resultBox.innerHTML = '<p class="muted" style="text-align:center;padding:10px">No se encontraron usuarios.</p>';
    return;
@@ -152,7 +154,7 @@ async function searchUsersForChat() {
 async function openDirectChatWithUser(recipientId) {
  if (!currentUser || !recipientId) return;
  const { data: convId } = await db.rpc('get_or_create_conversation', { user_a: currentUser.id, user_b: recipientId });
- const profile = profilesCache[recipientId] || (await db.from('profiles').select('*').eq('id', recipientId).single()).data;
+ const profile = profilesCache[recipientId] || (await db.from('og_profiles').select('*').eq('id', recipientId).single()).data;
  if (profile) {
   profilesCache[recipientId] = profile;
   openChatRoom(convId, profile);
@@ -340,4 +342,3 @@ function openChatSubSettings(type) {
   bodyEl.innerHTML = `<p class="muted">Tema actual: Minimalista Blanco</p><button class="secondary" onclick="alert('Tema azul clásico aplicado')">Azul Clásico</button><button class="secondary" onclick="alert('Tema monocromo aplicado')">Monocromo</button>`;
  }
 }
-

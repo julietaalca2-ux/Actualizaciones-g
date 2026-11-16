@@ -1,3 +1,4 @@
+
 /* Depende de: config.js (db); state.js (currentUser, myProfile, profilesCache, myActiveStories,
    storiesByUserMap, currentStoryGroupProfile, currentStoryGroupList, currentStoryGroupIndex,
    currentActiveStoryId, mediaStream, capturedBlob, currentFacingMode, currentZoom,
@@ -9,6 +10,7 @@
    openCameraModal, adjustZoom, startCameraStream, switchCamera, closeCameraModal,
    showCapturedPreview, takePhoto, handleGallerySelect, uploadCapturedStory
    Registra: gestos táctiles del visor de historias */
+
 function renderProgressSegments(containerId, totalCount, activeIndex) {
  const container = document.getElementById(containerId);
  if (!container) return;
@@ -90,7 +92,7 @@ async function loadStoriesData() {
  const otherUserIdsWithStories = Object.keys(storiesByUserMap).filter(uid => uid !== currentUser.id && storiesByUserMap[uid].length > 0);
  const missing = otherUserIdsWithStories.filter(id => !profilesCache[id]);
  if (missing.length > 0) {
-  const { data: profs } = await db.from('profiles').select('id, username, avatar_url').in('id', missing);
+  const { data: profs } = await db.from('og_profiles').select('id, username, avatar_url').in('id', missing);
   (profs || []).forEach(p => profilesCache[p.id] = p);
  }
 
@@ -344,4 +346,3 @@ async function uploadCapturedStory() {
   isUploadingStory = false;
  }
 }
-

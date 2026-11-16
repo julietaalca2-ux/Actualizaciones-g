@@ -151,13 +151,75 @@ async function searchUsersForChat() {
  }, 200);
 }
 
+function showChatNotice(message, type = 'error') {
+ const container = document.getElementById('chatMessagesContainer');
+ if (!container) return;
+ let notice = document.getElementById('chatSendStatus');
+ if (!notice) {
+  notice = document.createElement('div');
+  notice.id = 'chatSendStatus';
+  notice.setAttribute('role', 'status');
+  notice.style.cssText = 'margin:10px 14px;padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.4;';
+  container.prepend(notice);
+ }
+ notice.textContent = message;
+ notice.style.background = type === 'success' ? 'rgba(34,197,94,.10)' : 'rgba(220,38,38,.10)';
+ notice.style.color = type === 'success' ? '#15803d' : '#b91c1c';
+}
+
 async function openDirectChatWithUser(recipientId) {
- if (!currentUser || !recipientId) return;
- const { data: convId } = await db.rpc('get_or_create_conversation', { user_a: currentUser.id, user_b: recipientId });
- const profile = profilesCache[recipientId] || (await db.from('og_profiles').select('*').eq('id', recipientId).single()).data;
- if (profile) {
+ if (!currentUser || !recipientId) {
+  alert('No se pudo abrir el chat: falta tu sesión o el usuario destinatario.');
+  return;
+ }
+ if (recipientId === currentUser.id) return;
+
+ try {
+  const profileResult = profilesCache[recipientId]
+   ? { data: profilesCache[recipientId], error: null }
+   : await db.from('og_profiles')
+      .select('id, username, display_name, avatar_url')
+      .eq('id', recipientId)
+      .single();
+
+  if (profileResult.error || !profileResult.data) {
+   console.error('Ög chat: error al obtener el perfil destinatario', profileResult.error);
+   alert('No se pudo encontrar el perfil al que querés escribir.');
+   return;
+  }
+
+  const profile = profileResult.data;
   profilesCache[recipientId] = profile;
-  openChatRoom(convId, profile);
+
+  const result = await db.rpc('get_or_create_conversation', {
+   user_a: currentUser.id,
+   user_b: recipientId
+  });
+
+  if (result.error) {
+   console.error('Ög chat: error al crear/recuperar conversación', result.error);
+   alert('No se pudo iniciar la conversación. Revisá la configuración de conversaciones y permisos en Supabase. Detalle: ' + result.error.message);
+   return;
+  }
+
+  // Postgres functions returning UUID normally arrive as a string. Accept
+  // common object/array wrappers too, so the UI never opens an invalid room.
+  let conversationId = result.data;
+  if (Array.isArray(conversationId)) conversationId = conversationId[0];
+  if (conversationId && typeof conversationId === 'object') {
+   conversationId = conversationId.conversation_id || conversationId.id;
+  }
+
+  if (!conversationId) {
+   console.error('Ög chat: la función no devolvió un conversation_id', result);
+   alert('No se pudo obtener el identificador de la conversación. Revisá get_or_create_conversation en Supabase.');
+   return;
+  }
+
+  await openChatRoom(conversationId, profile);
+ } catch (error) {
+  console.error('Ög chat: error inesperado al abrir conversación', error);
+  alert('Ocurrió un error al abrir el chat: ' + (error.message || 'Error desconocido'));
  }
 }
 
@@ -197,14 +259,24 @@ async function openChatRoom(conversationId, recipientProfile) {
  const container = document.getElementById('chatMessagesContainer');
  container.innerHTML = '<div class="activity-empty">Cargando mensajes...</div>';
 
- const { data: msgs } = await db.from('messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+ const { data: msgs, error: messagesError } = await db.from('messages')
+  .select('*')
+  .eq('conversation_id', conversationId)
+  .order('created_at', { ascending: true });
+
  container.replaceChildren();
+ if (messagesError) {
+  console.error('Ög chat: error al cargar mensajes', messagesError);
+  showChatNotice('No se pudieron cargar los mensajes. Revisá los permisos de lectura en Supabase: ' + messagesError.message);
+  return;
+ }
+
  if (msgs && msgs.length) {
   const fragment = document.createDocumentFragment();
   msgs.forEach(m => fragment.append(buildChatMessageNode(m)));
   container.replaceChildren(fragment);
-  scrollToBottomChat();
  }
+ scrollToBottomChat();
 }
 
 function buildChatMessageNode(msg) {
@@ -257,26 +329,56 @@ function cancelReply() {
 }
 
 async function sendChatMessage() {
- if (!activeConversationId || !currentUser) return;
+ if (!activeConversationId || !currentUser) {
+  showChatNotice('No hay una conversación activa. Volvé al perfil y tocá Mensaje nuevamente.');
+  return;
+ }
+
  const input = document.getElementById('chatMessageInput');
+ if (!input) return;
  const text = input.value.trim();
  if (!text) return;
 
- input.value = '';
+ const sendButton = input.parentElement?.querySelector('button');
+ if (sendButton) sendButton.disabled = true;
+
+ // Insert only the core columns. Optional reply columns vary between database
+ // versions and must not prevent a normal text message from being delivered.
  const payload = {
   conversation_id: activeConversationId,
   sender_id: currentUser.id,
-  content: text,
-  reply_to_id: replyingToMessageId,
-  reply_to_snippet: replyingToSnippet
+  content: text
  };
- cancelReply();
 
- const { data: inserted } = await db.from('messages').insert(payload).select().single();
- if (inserted) {
+ try {
+  const { data: inserted, error } = await db.from('messages')
+   .insert(payload)
+   .select('*')
+   .single();
+
+  if (error) {
+   console.error('Ög chat: Supabase rechazó el mensaje', error);
+   showChatNotice('No se pudo enviar el mensaje: ' + error.message);
+   return; // Keep the text in the input so the user can retry.
+  }
+
+  if (!inserted) {
+   showChatNotice('Supabase no confirmó el guardado del mensaje. Intentá nuevamente.');
+   return;
+  }
+
+  input.value = '';
+  cancelReply();
+  const oldNotice = document.getElementById('chatSendStatus');
+  if (oldNotice) oldNotice.remove();
   appendChatMessageNode(inserted);
   scrollToBottomChat();
   cachedConversationsList = null;
+ } catch (error) {
+  console.error('Ög chat: error inesperado al enviar mensaje', error);
+  showChatNotice('Ocurrió un error al enviar: ' + (error.message || 'Error desconocido'));
+ } finally {
+  if (sendButton) sendButton.disabled = false;
  }
 }
 

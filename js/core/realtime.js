@@ -1,3 +1,4 @@
+
 /* Depende de: config.js (db); state.js (currentUser, presenceChannel, onlineUsersMap,
    activeRecipientProfile, realtimeChannel, dmRealtimeChannel, postsRealtimeChannel,
    cachedActivityEvents, cachedConversationsList, cachedFeedPosts, highlightsCacheByUser,
@@ -6,6 +7,7 @@
    loadHighlights, loadConversations, appendChatMessageNode, scrollToBottomChat,
    prependSinglePostToFeed
    Expone: setupPresenceChannel, setupRealtimeNotifications */
+
 function setupPresenceChannel() {
  if (presenceChannel) db.removeChannel(presenceChannel);
 
@@ -120,7 +122,11 @@ function setupRealtimeNotifications() {
    if (newPost.user_id !== currentUser.id && !followCheck) return;
 
    if (!profilesCache[newPost.user_id]) {
-    const { data: prof } = await db.from('profiles').select('id, username, display_name, avatar_url').eq('id', newPost.user_id).maybeSingle();
+    const { data: prof } = await db.from('og_profiles')
+     .select('id, username, display_name, avatar_url')
+     .eq('id', newPost.user_id)
+     .maybeSingle();
+
     if (prof) profilesCache[prof.id] = prof;
    }
 
@@ -129,4 +135,3 @@ function setupRealtimeNotifications() {
   })
   .subscribe();
 }
-

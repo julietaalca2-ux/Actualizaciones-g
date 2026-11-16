@@ -1,9 +1,8 @@
+
 /* Depende de: config.js (db); state.js (currentUser, profilesCache, onlineUsersMap,
    activeConversationId, activeRecipientProfile, replyingToMessageId, replyingToSnippet,
-   cachedConversationsList, renderedMessageIds, prefetchedConversationIds,
-   prefetchedMessagesByConv, dmSearchTimer); utils.js (formatDate, createAvatarNode,
-   setAvatarContent, ogCache, setCachedProfile, prefetchConversationMessages,
-   bindSmartPrefetch, PROFILE_SELECT_FIELDS, PROFILE_MINI_FIELDS)
+   cachedConversationsList, dmSearchTimer); utils.js (formatDate, createAvatarNode,
+   setAvatarContent)
    En tiempo de ejecución usa funciones de otros módulos: openPublicProfile (profile.js)
    Expone: checkGlobalUnreadMessages, loadConversations, renderConversationsDOM,
    searchUsersForChat, openDirectChatWithUser, openChatRoom, buildChatMessageNode,
@@ -11,113 +10,67 @@
    sendChatMessage, openChatDetailsPage, toggleChatDetailsMenu, handleChatActionMenu,
    openChatRecipientProfile, triggerChatSearch, openMuteOptionsModal, openChatSubSettings */
 
-const MESSAGE_SELECT_FIELDS = 'id, conversation_id, sender_id, content, reply_to_id, reply_to_snippet, created_at';
-
 async function checkGlobalUnreadMessages() {
  if (!currentUser) return;
- const { data: parts } = await db.from('conversation_participants')
-  .select('conversation_id, last_read_at')
-  .eq('user_id', currentUser.id);
- if (!parts || !parts.length) {
-  document.getElementById('navUnreadDot')?.classList.remove('active');
-  return;
- }
-
- const convIds = parts.map(p => p.conversation_id);
- // Eliminar N+1: traer mensajes recientes de todas las conversaciones en 1 sola consulta
- const { data: recentMsgs } = await db.from('messages')
-  .select('conversation_id, created_at, sender_id')
-  .in('conversation_id', convIds)
-  .order('created_at', { ascending: false })
-  .limit(Math.max(convIds.length * 4, 30));
-
- const latestByConv = {};
- (recentMsgs || []).forEach(m => {
-  if (!latestByConv[m.conversation_id]) latestByConv[m.conversation_id] = m;
- });
+ const { data: parts } = await db.from('conversation_participants').select('conversation_id, last_read_at').eq('user_id', currentUser.id);
+ if (!parts || !parts.length) return;
 
  for (const p of parts) {
-  const latest = latestByConv[p.conversation_id];
+  const { data: latest } = await db.from('messages')
+   .select('created_at, sender_id')
+   .eq('conversation_id', p.conversation_id)
+   .order('created_at', { ascending: false })
+   .limit(1)
+   .maybeSingle();
+
   if (latest && latest.sender_id !== currentUser.id) {
    if (!p.last_read_at || new Date(latest.created_at) > new Date(p.last_read_at)) {
-    document.getElementById('navUnreadDot')?.classList.add('active');
+    document.getElementById('navUnreadDot').classList.add('active');
     return;
    }
   }
  }
- document.getElementById('navUnreadDot')?.classList.remove('active');
+ document.getElementById('navUnreadDot').classList.remove('active');
 }
 
 async function loadConversations() {
  const container = document.getElementById('dmConversationsList');
  if (!currentUser) return;
 
- if (!cachedConversationsList) {
-  const cached = ogCache.get('conversations', 1000 * 60 * 60 * 12);
-  if (Array.isArray(cached)) cachedConversationsList = cached;
- }
- if (Array.isArray(cachedConversationsList)) {
-  renderConversationsDOM(cachedConversationsList, container);
- }
-
  try {
-  const { data: myParts } = await db.from('conversation_participants')
-   .select('conversation_id, last_read_at')
-   .eq('user_id', currentUser.id);
-
+  const { data: myParts } = await db.from('conversation_participants').select('conversation_id, last_read_at').eq('user_id', currentUser.id);
   if (!myParts || !myParts.length) {
-   cachedConversationsList = [];
-   ogCache.set('conversations', []);
    container.innerHTML = '<div class="activity-empty">No tenés conversaciones activas.</div>';
    return;
   }
 
   const convIds = myParts.map(p => p.conversation_id);
-
-  // Batch paralelo: participantes + últimos mensajes de todas las conversaciones en 2 únicas consultas
-  const [allPartsRes, recentMsgsRes] = await Promise.all([
-   db.from('conversation_participants').select('conversation_id, user_id').in('conversation_id', convIds),
-   db.from('messages')
-    .select('conversation_id, content, created_at, sender_id')
-    .in('conversation_id', convIds)
-    .order('created_at', { ascending: false })
-    .limit(Math.max(convIds.length * 4, 40))
-  ]);
+  const { data: allParts } = await db.from('conversation_participants').select('conversation_id, user_id').in('conversation_id', convIds);
 
   const convMap = {};
-  myParts.forEach(p => {
-   convMap[p.conversation_id] = { otherUserId: null, last_read_at: p.last_read_at };
-  });
-  (allPartsRes.data || []).forEach(p => {
-   if (p.user_id !== currentUser.id && convMap[p.conversation_id]) {
-    convMap[p.conversation_id].otherUserId = p.user_id;
-   }
-  });
-
-  const latestMsgByConv = {};
-  (recentMsgsRes.data || []).forEach(m => {
-   if (!latestMsgByConv[m.conversation_id]) latestMsgByConv[m.conversation_id] = m;
-  });
+  convIds.forEach(id => { convMap[id] = { otherUserId: null, last_read_at: myParts.find(p => p.conversation_id === id)?.last_read_at }; });
+  (allParts || []).forEach(p => { if (p.user_id !== currentUser.id && convMap[p.conversation_id]) convMap[p.conversation_id].otherUserId = p.user_id; });
 
   const otherUserIds = [...new Set(Object.values(convMap).map(c => c.otherUserId).filter(Boolean))];
   const missing = otherUserIds.filter(id => !profilesCache[id]);
   if (missing.length > 0) {
-   const { data: profs } = await db.from('og_profiles').select(PROFILE_MINI_FIELDS).in('id', missing);
-   (profs || []).forEach(p => setCachedProfile(p, false));
-   ogCache.set('profiles_map', profilesCache);
+   const { data: profs } = await db.from('og_profiles').select('id, username, display_name, avatar_url').in('id', missing);
+   (profs || []).forEach(p => profilesCache[p.id] = p);
   }
 
-  const valid = convIds.map(convId => {
-   const otherId = convMap[convId]?.otherUserId;
+  const conversationsList = await Promise.all(convIds.map(async convId => {
+   const otherId = convMap[convId].otherUserId;
    const profile = profilesCache[otherId];
    if (!profile) return null;
 
-   const lastMsg = latestMsgByConv[convId] || null;
-   const isUnread = Boolean(
-    lastMsg &&
-    lastMsg.sender_id !== currentUser.id &&
-    (!convMap[convId].last_read_at || new Date(lastMsg.created_at) > new Date(convMap[convId].last_read_at))
-   );
+   const { data: lastMsg } = await db.from('messages')
+    .select('content, created_at, sender_id')
+    .eq('conversation_id', convId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+   const isUnread = lastMsg && lastMsg.sender_id !== currentUser.id && (!convMap[convId].last_read_at || new Date(lastMsg.created_at) > new Date(convMap[convId].last_read_at));
 
    return {
     conversationId: convId,
@@ -127,21 +80,18 @@ async function loadConversations() {
     timestamp: lastMsg ? new Date(lastMsg.created_at).getTime() : 0,
     isUnread
    };
-  }).filter(Boolean);
+  }));
 
+  const valid = conversationsList.filter(Boolean);
   valid.sort((a, b) => b.timestamp - a.timestamp);
-  cachedConversationsList = valid;
-  ogCache.set('conversations', valid);
   renderConversationsDOM(valid, container);
  } catch (e) {
-  if (!cachedConversationsList) {
-   container.innerHTML = '<div class="activity-empty">Error al cargar conversaciones.</div>';
-  }
+  container.innerHTML = '<div class="activity-empty">Error al cargar conversaciones.</div>';
  }
 }
 
 function renderConversationsDOM(conversationsList, container) {
- if (!conversationsList || !conversationsList.length) {
+ if (!conversationsList.length) {
   container.innerHTML = '<div class="activity-empty">No hay conversaciones recientes.</div>';
   return;
  }
@@ -151,28 +101,13 @@ function renderConversationsDOM(conversationsList, container) {
   const row = document.createElement('div');
   row.className = 'dm-conv-item';
   row.onclick = () => openChatRoom(item.conversationId, item.profile);
-  bindSmartPrefetch(row, () => prefetchConversationMessages(item.conversationId));
 
   const av = createAvatarNode(item.profile, false);
   av.className += ' dm-conv-avatar';
 
   const info = document.createElement('div');
   info.className = 'dm-conv-info';
-
-  const nameRow = document.createElement('div');
-  nameRow.className = 'dm-conv-name';
-  const nameSpan = document.createElement('span');
-  nameSpan.textContent = item.profile.display_name || item.profile.username;
-  const timeSpan = document.createElement('span');
-  timeSpan.className = 'dm-conv-time';
-  timeSpan.textContent = item.time;
-  nameRow.append(nameSpan, timeSpan);
-
-  const snippetDiv = document.createElement('div');
-  snippetDiv.className = 'dm-conv-snippet';
-  snippetDiv.textContent = item.lastMessage;
-
-  info.append(nameRow, snippetDiv);
+  info.innerHTML = `<div class="dm-conv-name"><span>${item.profile.display_name || item.profile.username}</span><span class="dm-conv-time">${item.time}</span></div><div class="dm-conv-snippet">${item.lastMessage}</div>`;
 
   if (item.isUnread) {
    const dot = document.createElement('span');
@@ -192,7 +127,7 @@ async function searchUsersForChat() {
  if (val.length < 2) { resultBox.replaceChildren(); return; }
 
  dmSearchTimer = setTimeout(async () => {
-  const { data } = await db.from('og_profiles').select(PROFILE_MINI_FIELDS).ilike('username', '%' + val + '%').limit(10);
+  const { data } = await db.from('og_profiles').select('id, username, display_name, avatar_url').ilike('username', '%' + val + '%').limit(10);
   if (!data || !data.length) {
    resultBox.innerHTML = '<p class="muted" style="text-align:center;padding:10px">No se encontraron usuarios.</p>';
    return;
@@ -201,7 +136,7 @@ async function searchUsersForChat() {
   const fragment = document.createDocumentFragment();
   data.forEach(profile => {
    if (profile.id === currentUser?.id) return;
-   setCachedProfile(profile, false);
+   profilesCache[profile.id] = profile;
    const item = document.createElement('div');
    item.className = 'public-user';
    item.append(createAvatarNode(profile, false));
@@ -216,25 +151,76 @@ async function searchUsersForChat() {
  }, 200);
 }
 
-async function openDirectChatWithUser(recipientId) {
- if (!currentUser || !recipientId) return;
- const { data: convId } = await db.rpc('get_or_create_conversation', { user_a: currentUser.id, user_b: recipientId });
- const profile = profilesCache[recipientId] || (await db.from('og_profiles').select(PROFILE_SELECT_FIELDS).eq('id', recipientId).single()).data;
- if (profile) {
-  setCachedProfile(profile, true);
-  openChatRoom(convId, profile);
+function showChatNotice(message, type = 'error') {
+ const container = document.getElementById('chatMessagesContainer');
+ if (!container) return;
+ let notice = document.getElementById('chatSendStatus');
+ if (!notice) {
+  notice = document.createElement('div');
+  notice.id = 'chatSendStatus';
+  notice.setAttribute('role', 'status');
+  notice.style.cssText = 'margin:10px 14px;padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.4;';
+  container.prepend(notice);
  }
+ notice.textContent = message;
+ notice.style.background = type === 'success' ? 'rgba(34,197,94,.10)' : 'rgba(220,38,38,.10)';
+ notice.style.color = type === 'success' ? '#15803d' : '#b91c1c';
 }
 
-function renderChatMessagesList(msgs, container) {
- renderedMessageIds.clear();
- const fragment = document.createDocumentFragment();
- (msgs || []).forEach(m => {
-  if (m.id) renderedMessageIds.add(m.id);
-  fragment.append(buildChatMessageNode(m));
- });
- container.replaceChildren(fragment);
- scrollToBottomChat();
+async function openDirectChatWithUser(recipientId) {
+ if (!currentUser || !recipientId) {
+  alert('No se pudo abrir el chat: falta tu sesión o el usuario destinatario.');
+  return;
+ }
+ if (recipientId === currentUser.id) return;
+
+ try {
+  const profileResult = profilesCache[recipientId]
+   ? { data: profilesCache[recipientId], error: null }
+   : await db.from('og_profiles')
+      .select('id, username, display_name, avatar_url')
+      .eq('id', recipientId)
+      .single();
+
+  if (profileResult.error || !profileResult.data) {
+   console.error('Ög chat: error al obtener el perfil destinatario', profileResult.error);
+   alert('No se pudo encontrar el perfil al que querés escribir.');
+   return;
+  }
+
+  const profile = profileResult.data;
+  profilesCache[recipientId] = profile;
+
+  const result = await db.rpc('get_or_create_conversation', {
+   user_a: currentUser.id,
+   user_b: recipientId
+  });
+
+  if (result.error) {
+   console.error('Ög chat: error al crear/recuperar conversación', result.error);
+   alert('No se pudo iniciar la conversación. Revisá la configuración de conversaciones y permisos en Supabase. Detalle: ' + result.error.message);
+   return;
+  }
+
+  // Postgres functions returning UUID normally arrive as a string. Accept
+  // common object/array wrappers too, so the UI never opens an invalid room.
+  let conversationId = result.data;
+  if (Array.isArray(conversationId)) conversationId = conversationId[0];
+  if (conversationId && typeof conversationId === 'object') {
+   conversationId = conversationId.conversation_id || conversationId.id;
+  }
+
+  if (!conversationId) {
+   console.error('Ög chat: la función no devolvió un conversation_id', result);
+   alert('No se pudo obtener el identificador de la conversación. Revisá get_or_create_conversation en Supabase.');
+   return;
+  }
+
+  await openChatRoom(conversationId, profile);
+ } catch (error) {
+  console.error('Ög chat: error inesperado al abrir conversación', error);
+  alert('Ocurrió un error al abrir el chat: ' + (error.message || 'Error desconocido'));
+ }
 }
 
 async function openChatRoom(conversationId, recipientProfile) {
@@ -255,7 +241,6 @@ async function openChatRoom(conversationId, recipientProfile) {
  if (recipientProfile.avatar_url) {
   const img = document.createElement('img');
   img.src = recipientProfile.avatar_url;
-  img.decoding = 'async';
   headerAvatar.append(img);
  } else {
   headerAvatar.textContent = '👤';
@@ -268,38 +253,36 @@ async function openChatRoom(conversationId, recipientProfile) {
 
  document.getElementById('chatRoomStatusSub').textContent = onlineUsersMap[recipientProfile.id] ? 'En línea' : 'Desconectado';
 
- const container = document.getElementById('chatMessagesContainer');
- const cachedMsgs = prefetchedMessagesByConv[conversationId] || ogCache.get(`chat_msgs_${conversationId}`, 1000 * 60 * 60 * 12);
- if (Array.isArray(cachedMsgs) && cachedMsgs.length > 0) {
-  renderChatMessagesList(cachedMsgs, container);
- } else {
-  renderedMessageIds.clear();
-  container.innerHTML = '<div class="activity-empty">Cargando mensajes...</div>';
- }
-
- const [, msgsRes] = await Promise.all([
-  db.from('conversation_participants').update({ last_read_at: new Date().toISOString() }).eq('conversation_id', conversationId).eq('user_id', currentUser.id),
-  db.from('messages').select(MESSAGE_SELECT_FIELDS).eq('conversation_id', conversationId).order('created_at', { ascending: true })
- ]);
-
+ await db.from('conversation_participants').update({ last_read_at: new Date().toISOString() }).eq('conversation_id', conversationId).eq('user_id', currentUser.id);
  checkGlobalUnreadMessages();
 
- const msgs = msgsRes.data;
- if (activeConversationId !== conversationId) return;
- if (msgs) {
-  prefetchedMessagesByConv[conversationId] = msgs;
-  ogCache.set(`chat_msgs_${conversationId}`, msgs.slice(-50));
-  renderChatMessagesList(msgs, container);
- } else if (!cachedMsgs) {
-  container.replaceChildren();
+ const container = document.getElementById('chatMessagesContainer');
+ container.innerHTML = '<div class="activity-empty">Cargando mensajes...</div>';
+
+ const { data: msgs, error: messagesError } = await db.from('messages')
+  .select('*')
+  .eq('conversation_id', conversationId)
+  .order('created_at', { ascending: true });
+
+ container.replaceChildren();
+ if (messagesError) {
+  console.error('Ög chat: error al cargar mensajes', messagesError);
+  showChatNotice('No se pudieron cargar los mensajes. Revisá los permisos de lectura en Supabase: ' + messagesError.message);
+  return;
  }
+
+ if (msgs && msgs.length) {
+  const fragment = document.createDocumentFragment();
+  msgs.forEach(m => fragment.append(buildChatMessageNode(m)));
+  container.replaceChildren(fragment);
+ }
+ scrollToBottomChat();
 }
 
 function buildChatMessageNode(msg) {
  const isMine = msg.sender_id === currentUser.id;
  const bubble = document.createElement('div');
  bubble.className = `chat-bubble ${isMine ? 'sent' : 'received'}`;
- if (msg.id) bubble.dataset.msgId = msg.id;
  bubble.onclick = () => triggerReplyToMessage(msg.id, msg.content);
 
  if (msg.reply_to_snippet) {
@@ -322,19 +305,13 @@ function buildChatMessageNode(msg) {
 }
 
 function appendChatMessageNode(msg) {
- if (msg?.id && renderedMessageIds.has(msg.id)) return null;
- if (msg?.id) renderedMessageIds.add(msg.id);
  const container = document.getElementById('chatMessagesContainer');
- const emptyPlaceholder = container.querySelector('.activity-empty');
- if (emptyPlaceholder) emptyPlaceholder.remove();
- const node = buildChatMessageNode(msg);
- container.append(node);
- return node;
+ container.append(buildChatMessageNode(msg));
 }
 
 function scrollToBottomChat() {
  const container = document.getElementById('chatMessagesContainer');
- if (container) container.scrollTop = container.scrollHeight;
+ container.scrollTop = container.scrollHeight;
 }
 
 function triggerReplyToMessage(msgId, content) {
@@ -352,66 +329,56 @@ function cancelReply() {
 }
 
 async function sendChatMessage() {
- if (!activeConversationId || !currentUser) return;
- const input = document.getElementById('chatMessageInput');
- const text = input.value.trim();
- if (!text) return;
-
- const targetConvId = activeConversationId;
- const replyId = replyingToMessageId;
- const replySnippet = replyingToSnippet;
-
- input.value = '';
- cancelReply();
-
- // Optimistic UI: insertar burbuja de inmediato (0 ms)
- const tempId = 'optimistic-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
- const optimisticMsg = {
-  id: tempId,
-  conversation_id: targetConvId,
-  sender_id: currentUser.id,
-  content: text,
-  reply_to_id: replyId,
-  reply_to_snippet: replySnippet,
-  created_at: new Date().toISOString()
- };
- const optimisticNode = appendChatMessageNode(optimisticMsg);
- scrollToBottomChat();
-
- const payload = {
-  conversation_id: targetConvId,
-  sender_id: currentUser.id,
-  content: text,
-  reply_to_id: replyId,
-  reply_to_snippet: replySnippet
- };
-
- const { data: inserted, error } = await db.from('messages')
-  .insert(payload)
-  .select(MESSAGE_SELECT_FIELDS)
-  .single();
-
- if (error) {
-  if (optimisticNode) {
-   optimisticNode.style.opacity = '0.55';
-   const timeEl = optimisticNode.querySelector('.chat-bubble-time');
-   if (timeEl) timeEl.textContent = 'Error al enviar';
-  }
+ if (!activeConversationId || !currentUser) {
+  showChatNotice('No hay una conversación activa. Volvé al perfil y tocá Mensaje nuevamente.');
   return;
  }
 
- if (inserted) {
-  renderedMessageIds.delete(tempId);
-  renderedMessageIds.add(inserted.id);
-  if (optimisticNode) {
-   optimisticNode.dataset.msgId = inserted.id;
-   optimisticNode.onclick = () => triggerReplyToMessage(inserted.id, inserted.content);
+ const input = document.getElementById('chatMessageInput');
+ if (!input) return;
+ const text = input.value.trim();
+ if (!text) return;
+
+ const sendButton = input.parentElement?.querySelector('button');
+ if (sendButton) sendButton.disabled = true;
+
+ // Insert only the core columns. Optional reply columns vary between database
+ // versions and must not prevent a normal text message from being delivered.
+ const payload = {
+  conversation_id: activeConversationId,
+  sender_id: currentUser.id,
+  content: text
+ };
+
+ try {
+  const { data: inserted, error } = await db.from('messages')
+   .insert(payload)
+   .select('*')
+   .single();
+
+  if (error) {
+   console.error('Ög chat: Supabase rechazó el mensaje', error);
+   showChatNotice('No se pudo enviar el mensaje: ' + error.message);
+   return; // Keep the text in the input so the user can retry.
   }
-  const prevCache = prefetchedMessagesByConv[targetConvId] || [];
-  prefetchedMessagesByConv[targetConvId] = [...prevCache, inserted];
-  ogCache.set(`chat_msgs_${targetConvId}`, prefetchedMessagesByConv[targetConvId].slice(-50));
+
+  if (!inserted) {
+   showChatNotice('Supabase no confirmó el guardado del mensaje. Intentá nuevamente.');
+   return;
+  }
+
+  input.value = '';
+  cancelReply();
+  const oldNotice = document.getElementById('chatSendStatus');
+  if (oldNotice) oldNotice.remove();
+  appendChatMessageNode(inserted);
+  scrollToBottomChat();
   cachedConversationsList = null;
-  ogCache.remove('conversations');
+ } catch (error) {
+  console.error('Ög chat: error inesperado al enviar mensaje', error);
+  showChatNotice('Ocurrió un error al enviar: ' + (error.message || 'Error desconocido'));
+ } finally {
+  if (sendButton) sendButton.disabled = false;
  }
 }
 

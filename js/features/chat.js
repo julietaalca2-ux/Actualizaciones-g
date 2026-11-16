@@ -24,7 +24,6 @@ async function checkGlobalUnreadMessages() {
  }
 
  const convIds = parts.map(p => p.conversation_id);
- // Eliminar N+1: traer mensajes recientes de todas las conversaciones en 1 sola consulta
  const { data: recentMsgs } = await db.from('messages')
   .select('conversation_id, created_at, sender_id')
   .in('conversation_id', convIds)
@@ -74,7 +73,6 @@ async function loadConversations() {
 
   const convIds = myParts.map(p => p.conversation_id);
 
-  // Batch paralelo: participantes + últimos mensajes de todas las conversaciones en 2 únicas consultas
   const [allPartsRes, recentMsgsRes] = await Promise.all([
    db.from('conversation_participants').select('conversation_id, user_id').in('conversation_id', convIds),
    db.from('messages')
@@ -217,15 +215,8 @@ async function searchUsersForChat() {
 }
 
 async function openDirectChatWithUser(recipientId) {
- if (!currentUser || !recipientId || recipientId === currentUser.id) return;
- const { data: convId, error } = await db.rpc('get_or_create_conversation', {
-  user_a: currentUser.id,
-  user_b: recipientId
- });
- if (error || !convId) {
-  alert('No se pudo iniciar la conversación. Revisá la configuración en Supabase.\nDetalle: ' + (error?.message || 'ID de conversación vacío'));
-  return;
- }
+ if (!currentUser || !recipientId) return;
+ const { data: convId } = await db.rpc('get_or_create_conversation', { user_a: currentUser.id, user_b: recipientId });
  const profile = profilesCache[recipientId] || (await db.from('og_profiles').select(PROFILE_SELECT_FIELDS).eq('id', recipientId).single()).data;
  if (profile) {
   setCachedProfile(profile, true);
@@ -371,7 +362,6 @@ async function sendChatMessage() {
  input.value = '';
  cancelReply();
 
- // Optimistic UI: insertar burbuja de inmediato (0 ms)
  const tempId = 'optimistic-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
  const optimisticMsg = {
   id: tempId,

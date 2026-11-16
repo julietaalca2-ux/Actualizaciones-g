@@ -217,8 +217,15 @@ async function searchUsersForChat() {
 }
 
 async function openDirectChatWithUser(recipientId) {
- if (!currentUser || !recipientId) return;
- const { data: convId } = await db.rpc('get_or_create_conversation', { user_a: currentUser.id, user_b: recipientId });
+ if (!currentUser || !recipientId || recipientId === currentUser.id) return;
+ const { data: convId, error } = await db.rpc('get_or_create_conversation', {
+  user_a: currentUser.id,
+  user_b: recipientId
+ });
+ if (error || !convId) {
+  alert('No se pudo iniciar la conversación. Revisá la configuración en Supabase.\nDetalle: ' + (error?.message || 'ID de conversación vacío'));
+  return;
+ }
  const profile = profilesCache[recipientId] || (await db.from('og_profiles').select(PROFILE_SELECT_FIELDS).eq('id', recipientId).single()).data;
  if (profile) {
   setCachedProfile(profile, true);

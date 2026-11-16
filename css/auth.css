@@ -59,3 +59,44 @@
 .auth-panel { display: none; width: 100%; flex-direction: column; gap: 12px; animation: fadeInScale 0.2s ease; }
 .auth-panel.active { display: flex; }
 
+
+
+/* Acceso y vinculación de Google */
+.google-auth-button {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  border: 1px solid var(--border-color, rgba(128,128,128,.3));
+  border-radius: 12px;
+  background: var(--bg-card, #fff);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.google-auth-button:active { transform: scale(.99); }
+.google-g {
+  display: inline-grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  color: #4285f4;
+  font: 700 16px Arial, sans-serif;
+}
+.account-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border-color, rgba(128,128,128,.25));
+  border-radius: 14px;
+}
+.account-link-copy { display: flex; flex-direction: column; gap: 5px; }
+.account-link-copy span { color: var(--text-secondary); font-size: 13px; }
+#googleLinkButton:disabled { opacity: .65; cursor: default; }

@@ -1,11 +1,10 @@
-
 /* Depende de: config.js (db); state.js (currentUser, myProfile, viewedProfile, isFollowing,
    profilesCache, stagedAvatarBlob, cachedFeedPosts); utils.js (setAvatarContent,
    setPreviewBlobUrl, createAvatarNode, updateNavAvatarUI, renderPostsGrid);
    core/navigation.js (showTab)
    En tiempo de ejecución usa funciones de otros módulos: loadSavedPostsProfileGrid,
    loadInitialPosts, openPostDetail (feed.js), loadHighlights (highlights.js),
-   loadStoriesData (stories.js)
+   loadStoriesData (stories.js), openDirectChatWithUser (chat.js)
    Expone: updateProfileUI, openEditProfileModal, closeEditProfileModal, stageImage,
    saveFullProfile, loadMyPostsGrid, switchProfileTab, switchPublicProfileTab,
    shareProfileLink, openPublicProfile, loadPublicCounts, checkFollowStatus, toggleFollow,
@@ -331,6 +330,13 @@ async function openPublicProfile(userId) {
  }
 
  setAvatarContent(document.getElementById('publicavatar'), profile.avatar_url);
+
+ const msgBtn = document.querySelector('#publicprofile .profile-action-buttons-row button.secondary');
+ if (msgBtn) {
+  msgBtn.disabled = false;
+  msgBtn.textContent = 'Mensaje';
+  msgBtn.onclick = () => openDirectChatWithUser(profile.id, msgBtn);
+ }
 
  showTab('publicprofile');
  checkFollowStatus(userId);

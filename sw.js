@@ -1,8 +1,13 @@
 /* ÖG — Service Worker (og-mobile-dev) */
 
-const VERSION = '1.3.3';
+const VERSION = '1.5.0';
 const CACHE_PREFIX = 'og-mobile-dev-';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
+
+/* Caché de imágenes del CDN de Supabase: aparte, para que sobreviva a las actualizaciones de la app */
+const MEDIA_CACHE = 'og-media-images-v1';
+const MEDIA_MAX_ENTRIES = 150;
+const STORAGE_PATH = '/storage/v1/';
 
 const SCOPE = self.registration.scope;
 const toURL = (path) => new URL(path, SCOPE).href;
@@ -29,14 +34,20 @@ const APP_SHELL = [
   'css/calls.css',
   'css/profile.css',
   'css/settings.css',
+  'css/loors.css',
+  'css/notes.css',
+  'css/verification.css',
   'css/style.css',
+  'css/animations.css',
   'js/config.js',
   'js/state.js',
   'js/utils.js',
+  'js/core/performance.js',
   'js/app.js',
   'js/core/pwa.js',
   'js/core/navigation.js',
   'js/core/realtime.js',
+  'js/core/stability.js',
   'js/features/activity.js',
   'js/features/auth.js',
   'js/features/chat.js',
@@ -48,6 +59,12 @@ const APP_SHELL = [
   'js/features/profile.js',
   'js/features/settings.js',
   'js/features/stories.js',
+  'js/features/loors.js',
+  'js/features/notes.js',
+  'js/features/audio-library.js',
+  'js/features/verified.badge.js',
+  'js/features/verification.js',
+  'js/features/verification-admin.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png'
@@ -77,7 +94,7 @@ self.addEventListener('activate', (event) => {
     const keys = await caches.keys();
     await Promise.all(
       keys
-        .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
+        .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME && k !== MEDIA_CACHE)
         .map((k) => caches.delete(k))
     );
     await self.clients.claim();
@@ -116,8 +133,43 @@ self.addEventListener('fetch', (event) => {
   if (url.hostname === CDN_HOST) {
     event.respondWith(staleWhileRevalidate(event, req));
   }
-  // Todo lo demás (API de Supabase, imágenes, etc.) va directo a la red.
+
+  // Imágenes del almacenamiento de Supabase (fotos, miniaturas, avatares): primero la caché
+  if (url.pathname.includes(STORAGE_PATH) && req.destination === 'image') {
+    event.respondWith(cacheFirstImage(event, req));
+    return;
+  }
+  // Todo lo demás (API de Supabase, videos, audios) va directo a la red.
 });
+
+/* Imágenes: si ya se vieron, salen al instante de la caché (los nombres son únicos, no cambian).
+   Se guarda como máximo MEDIA_MAX_ENTRIES; al pasarse se borran las más viejas. */
+async function cacheFirstImage(event, req) {
+  const cache = await caches.open(MEDIA_CACHE);
+  const cached = await cache.match(req.url);
+  if (cached) return cached;
+  try {
+    // Pedido con CORS para poder guardar la respuesta sin inflar el espacio (las "opacas" ocupan de más)
+    let res;
+    try {
+      res = await fetch(req.url, { mode: 'cors', credentials: 'omit' });
+    } catch (e) {
+      res = await fetch(req);
+    }
+    if (res && res.ok && res.type !== 'opaque') {
+      event.waitUntil((async () => {
+        await cache.put(req.url, res.clone());
+        const keys = await cache.keys();
+        if (keys.length > MEDIA_MAX_ENTRIES) {
+          await Promise.all(keys.slice(0, keys.length - MEDIA_MAX_ENTRIES).map((k) => cache.delete(k)));
+        }
+      })());
+    }
+    return res;
+  } catch (e) {
+    return new Response('', { status: 503, statusText: 'Sin conexión' });
+  }
+}
 
 /* Navegación: red primero; sin conexión, se muestra index.html guardado */
 async function handleNavigation(req, url) {

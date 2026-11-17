@@ -48,10 +48,12 @@
 <link rel="stylesheet" href="css/explore.css">
 <link rel="stylesheet" href="css/profile.css">
 <link rel="stylesheet" href="css/chat.css">
+<link rel="stylesheet" href="css/calls.css">
 <link rel="stylesheet" href="css/settings.css">
 <link rel="stylesheet" href="css/camera.css">
 <link rel="stylesheet" href="css/loors.css">
 <link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/verification.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body id="appBody">
@@ -392,6 +394,12 @@ Tu historia
 <small id="chatRoomStatusSub" style="color:var(--text-muted);font-size:11px;display:block;">Desconectado</small>
 </div>
 </div>
+<button class="icon chat-call-btn" onclick="startCall(false)" aria-label="Llamar">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+</button>
+<button class="icon chat-call-btn" onclick="startCall(true)" aria-label="Videollamada">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+</button>
 <button class="icon" onclick="openChatDetailsPage()" aria-label="Detalles">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
 </button>
@@ -402,9 +410,31 @@ Tu historia
 <div>Respondiendo a: <strong id="replyingTextSnippet">...</strong></div>
 <button class="secondary" style="padding:2px 6px;font-size:11px;" onclick="cancelReply()">✕</button>
 </div>
+<div id="chatAttachMenu" class="chat-attach-menu">
+<button type="button" onclick="pickChatGallery()"><span>🖼️</span> Foto o video</button>
+<button type="button" onclick="pickChatFile()"><span>📎</span> Archivo</button>
+</div>
 <div class="chat-input-row">
+<button type="button" class="chat-tool-btn" onclick="openChatCamera()" aria-label="Cámara">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+</button>
+<button type="button" class="chat-tool-btn" onclick="toggleChatAttachMenu(event)" aria-label="Adjuntar">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+</button>
 <textarea class="chat-message-input" id="chatMessageInput" rows="1" placeholder="Escribe un mensaje..." oninput="autoGrowChatInput(this)" onkeydown="handleChatInputKey(event)"></textarea>
+<button type="button" class="chat-mic-btn" onclick="startChatRecording()" aria-label="Grabar mensaje de voz">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+</button>
 <button class="primary chat-send-btn" onclick="sendChatMessage()" aria-label="Enviar">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+</button>
+</div>
+<div class="chat-record-bar" id="chatRecordBar">
+<button type="button" class="chat-record-cancel" onclick="cancelChatRecording()" aria-label="Cancelar grabación">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+</button>
+<div class="chat-record-info"><span class="chat-record-dot"></span><span id="chatRecordTimer">0:00</span><small>Grabando…</small></div>
+<button type="button" class="primary chat-send-btn chat-record-send" onclick="sendChatRecording()" aria-label="Enviar audio">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
 </button>
 </div>
@@ -536,6 +566,20 @@ Tu historia
 <span class="menu-list-left">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
 <span>Ayuda</span>
+</span>
+<svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</button>
+<button class="menu-list-btn" data-verification-request>
+<span class="menu-list-left">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 2.1 3.2-.3 1.1 3 2.8 1.6-.9 3.1.9 3.1-2.8 1.6-1.1 3-3.2-.3L12 22l-2.4-2.1-3.2.3-1.1-3-2.8-1.6.9-3.1-.9-3.1 2.8-1.6 1.1-3 3.2.3z"/><polyline points="8.5 12.5 11 15 15.5 9.5"/></svg>
+<span>Solicitar verificación</span>
+</span>
+<svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</button>
+<button class="menu-list-btn" id="menuVerifAdminBtn" style="display:none;" onclick="openMenuSubPage('menuVerificationAdminPage');VerificationAdmin.mount('#verification-admin');">
+<span class="menu-list-left">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+<span>Panel de verificaciones</span>
 </span>
 <svg class="menu-list-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
 </button>
@@ -687,6 +731,15 @@ Tu historia
 <textarea id="helpReportInput" placeholder="Describe la consulta o incidencia técnica..." style="height:100px;"></textarea>
 <button class="primary" style="margin-top:12px;" onclick="submitHelpReport()">Enviar mensaje a soporte</button>
 <p id="helpReportStatus" class="status"></p>
+</div>
+</div>
+<div id="menuVerificationAdminPage" class="fullscreen-menu-view">
+<div class="menu-section-header">
+<button class="secondary" style="padding:6px 14px;font-size:13px;" onclick="backToMainMenu('menuVerificationAdminPage')">← Menú</button>
+<strong style="font-size:16px;color:var(--text-primary);">Verificaciones</strong>
+</div>
+<div class="menu-section-content">
+<div id="verification-admin"></div>
 </div>
 </div>
 <div id="menuAccountsPage" class="fullscreen-menu-view">
@@ -1077,6 +1130,67 @@ Subir
 </button>
 </nav>
 <!-- 6. SCRIPTS -->
+<!-- Chat: inputs ocultos para adjuntar -->
+<input type="file" id="chatGalleryInput" class="hidden-file" accept="image/*,video/*" multiple onchange="handleChatFilesSelected(this)">
+<input type="file" id="chatFileInput" class="hidden-file" multiple onchange="handleChatFilesSelected(this)">
+<input type="file" id="chatCameraFallbackInput" class="hidden-file" accept="image/*" capture="environment" onchange="handleChatFilesSelected(this)">
+<!-- Chat: cámara -->
+<div id="chatCameraModal">
+<video id="chatCameraVideo" autoplay playsinline muted></video>
+<img id="chatCameraPreview" alt="Foto tomada">
+<button type="button" class="chat-camera-close" onclick="closeChatCamera()" aria-label="Cerrar">✕</button>
+<div class="chat-camera-bar chat-camera-bar--live">
+<span class="chat-camera-side"></span>
+<button type="button" class="chat-camera-shutter" onclick="captureChatPhoto()" aria-label="Tomar foto"></button>
+<button type="button" class="chat-camera-side chat-camera-flip" onclick="switchChatCamera()" aria-label="Cambiar cámara">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+</button>
+</div>
+<div class="chat-camera-bar chat-camera-bar--preview">
+<button type="button" class="chat-camera-text-btn" onclick="retakeChatPhoto()">Repetir</button>
+<button type="button" class="chat-camera-text-btn primary" onclick="sendChatCameraPhoto()">Enviar</button>
+</div>
+</div>
+<!-- Llamada entrante -->
+<div id="incomingCallOverlay">
+<div class="incoming-call-card">
+<div id="incomingCallAvatar" class="call-avatar"></div>
+<strong id="incomingCallName">Alguien</strong>
+<span id="incomingCallKind">Llamada entrante…</span>
+<div class="incoming-call-actions">
+<button type="button" class="call-round-btn hangup" onclick="rejectIncomingCall()" aria-label="Rechazar">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.956.956 0 0 1-.29-.7c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.27 11.27 0 0 0-2.67-1.85.996.996 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+</button>
+<button type="button" class="call-round-btn accept" onclick="acceptIncomingCall()" aria-label="Aceptar">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+</button>
+</div>
+</div>
+</div>
+<!-- Llamada en curso -->
+<div id="callOverlay">
+<video id="callRemoteVideo" autoplay playsinline></video>
+<div class="call-audio-bg"><div id="callPeerAvatar" class="call-avatar"></div></div>
+<div class="call-top">
+<strong id="callPeerName">Llamada</strong>
+<span id="callStatus">Llamando…</span>
+</div>
+<video id="callLocalVideo" autoplay playsinline muted></video>
+<div class="call-controls">
+<button type="button" id="callMuteBtn" class="call-ctrl-btn" onclick="toggleCallMute()" aria-label="Silenciar micrófono">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/><line class="slash" x1="3" y1="3" x2="21" y2="21"/></svg>
+</button>
+<button type="button" id="callCamBtn" class="call-ctrl-btn" onclick="toggleCallCamera()" aria-label="Apagar cámara">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/><line class="slash" x1="3" y1="3" x2="21" y2="21"/></svg>
+</button>
+<button type="button" id="callFlipBtn" class="call-ctrl-btn" onclick="switchCallCamera()" aria-label="Cambiar cámara">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+</button>
+<button type="button" class="call-ctrl-btn hangup" onclick="hangUpCall()" aria-label="Colgar">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.956.956 0 0 1-.29-.7c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.27 11.27 0 0 0-2.67-1.85.996.996 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+</button>
+</div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/state.js"></script>
@@ -1086,6 +1200,8 @@ Subir
 <script src="js/core/realtime.js"></script>
 <script src="js/features/settings.js"></script>
 <script src="js/features/auth.js"></script>
+<script src="js/features/verified.badge.js"></script>
+<script src="js/features/verification.js"></script>
 <script src="js/features/feed.js"></script>
 <script src="js/features/stories.js"></script>
 <script src="js/features/highlights.js"></script>
@@ -1093,9 +1209,42 @@ Subir
 <script src="js/features/profile.js"></script>
 <script src="js/features/activity.js"></script>
 <script src="js/features/chat.js"></script>
+<script src="js/features/chat-media.js"></script>
+<script src="js/features/calls.js"></script>
 <script src="js/features/loors.js"></script>
 <script src="js/features/audio-library.js"></script>
 <script src="js/features/notes.js"></script>
+<script src="js/features/verification-admin.js"></script>
 <script src="js/app.js"></script>
+<script>
+/* Inicialización del sistema de verificación (usa tu cliente `db` de config.js) */
+(function () {
+  function checkAdmin() {
+    var btn = document.getElementById('menuVerifAdminBtn');
+    if (!btn || !window.VerificationAdmin) return;
+    VerificationAdmin.isAdmin().then(function (ok) {
+      btn.style.display = ok ? '' : 'none';
+    }).catch(function () { btn.style.display = 'none'; });
+  }
+  function setup() {
+    try {
+      VerificationSystem.init(db, {
+        profilesTable: 'og_profiles',
+        getUser: function () { return (typeof currentUser !== 'undefined') ? currentUser : null; },
+        fields: { username: 'username', fullName: 'display_name', avatar: 'avatar_url' }
+      });
+    } catch (err) {
+      console.error('[verification] init falló:', err);
+      return;
+    }
+    checkAdmin();
+    db.auth.onAuthStateChange(function () {
+      setTimeout(function () { checkAdmin(); VerificationSystem.refresh(); }, 0);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
+  else setup();
+})();
+</script>
 </body>
 </html>

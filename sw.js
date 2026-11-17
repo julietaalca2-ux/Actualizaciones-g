@@ -1,6 +1,6 @@
 /* ÖG — Service Worker (og-mobile-dev) */
 
-const VERSION = '1.2.1';
+const VERSION = '1.3.3';
 const CACHE_PREFIX = 'og-mobile-dev-';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 
@@ -26,6 +26,7 @@ const APP_SHELL = [
   'css/feed.css',
   'css/explore.css',
   'css/chat.css',
+  'css/calls.css',
   'css/profile.css',
   'css/settings.css',
   'css/style.css',
@@ -39,6 +40,8 @@ const APP_SHELL = [
   'js/features/activity.js',
   'js/features/auth.js',
   'js/features/chat.js',
+  'js/features/chat-media.js',
+  'js/features/calls.js',
   'js/features/explore.js',
   'js/features/feed.js',
   'js/features/highlights.js',
@@ -100,6 +103,9 @@ self.addEventListener('fetch', (event) => {
     if (!url.href.startsWith(SCOPE)) return;
     if (req.mode === 'navigate') {
       event.respondWith(handleNavigation(req, url));
+    } else if (/\.(js|css|json)$/i.test(url.pathname)) {
+      // Código de la app: red primero, así nunca queda un CSS/JS viejo mezclado con un HTML nuevo
+      event.respondWith(networkFirst(req));
     } else {
       event.respondWith(staleWhileRevalidate(event, req));
     }
@@ -127,6 +133,19 @@ async function handleNavigation(req, url) {
       status: 503,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }
     });
+  }
+}
+
+/* JS / CSS / JSON propios: se pide a la red (revalidando contra el servidor) y, si no hay conexión, se usa la copia guardada */
+async function networkFirst(req) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const res = await fetch(req, { cache: 'no-cache' });
+    if (res.ok) cache.put(req, res.clone());
+    return res;
+  } catch (e) {
+    const cached = (await cache.match(req)) || (await cache.match(req, { ignoreSearch: true }));
+    return cached || new Response('', { status: 503, statusText: 'Sin conexión' });
   }
 }
 

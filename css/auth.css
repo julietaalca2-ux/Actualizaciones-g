@@ -88,6 +88,32 @@
   color: #4285f4;
   font: 700 16px Arial, sans-serif;
 }
+
+/* Acceso con Facebook */
+.facebook-auth-button {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  border: 1px solid #1877F2;
+  border-radius: 12px;
+  background: #1877F2;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+.facebook-auth-button:hover { background: #166fe5; }
+.facebook-auth-button:active { transform: scale(.99); }
+.facebook-f {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 .account-link-card {
   display: flex;
   flex-direction: column;

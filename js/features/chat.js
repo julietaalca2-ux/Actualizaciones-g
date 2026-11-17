@@ -412,7 +412,7 @@ async function openDirectChatWithUser(recipientId, triggerBtn = null) {
   try {
     let convId = null;
 
-    // 1. Intentar obtener o crear la conversación mediante RPC
+    // 1. Intentar obtener o crear la conversación vía RPC
     const { data: rpcConvId, error: rpcError } = await db.rpc('get_or_create_conversation', {
       user_a: currentUser.id,
       user_b: targetId
@@ -421,7 +421,9 @@ async function openDirectChatWithUser(recipientId, triggerBtn = null) {
     if (!rpcError && rpcConvId) {
       convId = rpcConvId;
     } else {
-      // 2. Respaldo directo si la RPC no responde o tiene otra firma
+      console.warn('ÖG Chat - RPC fallback:', rpcError?.message || rpcError);
+
+      // 2. Buscar conversación compartida existente
       const { data: myParts } = await db
         .from('conversation_participants')
         .select('conversation_id')
@@ -442,24 +444,25 @@ async function openDirectChatWithUser(recipientId, triggerBtn = null) {
         }
       }
 
+      // 3. Crear conversación con ID generado en cliente (evita bloqueo RLS de RETURNING)
       if (!convId) {
-        const { data: newConv, error: convErr } = await db
-          .from('conversations')
-          .insert({})
-          .select('id')
-          .single();
+        const generatedId = crypto.randomUUID();
 
-        if (convErr || !newConv) throw convErr || new Error('No se pudo crear la conversación.');
-        convId = newConv.id;
+        const { error: convErr } = await db
+          .from('conversations')
+          .insert({ id: generatedId });
+
+        if (convErr) throw convErr;
 
         const { error: partErr } = await db
           .from('conversation_participants')
           .insert([
-            { conversation_id: convId, user_id: currentUser.id, last_read_at: new Date().toISOString() },
-            { conversation_id: convId, user_id: targetId, last_read_at: null }
+            { conversation_id: generatedId, user_id: currentUser.id, last_read_at: new Date().toISOString() },
+            { conversation_id: generatedId, user_id: targetId, last_read_at: null }
           ]);
 
         if (partErr) throw partErr;
+        convId = generatedId;
       }
     }
 
@@ -473,7 +476,7 @@ async function openDirectChatWithUser(recipientId, triggerBtn = null) {
       profile = fetchedProfile;
     }
 
-    if (!profile) throw new Error('No se encontró el perfil del destinatario.');
+    if (!profile) throw new Error('No se encontró el perfil.');
 
     profilesCache[targetId] = profile;
     cachedConversationsList = null;
@@ -483,8 +486,8 @@ async function openDirectChatWithUser(recipientId, triggerBtn = null) {
     console.error('ÖG Chat - Error abriendo chat directo:', e);
     const statusEl = document.getElementById('publicstatus');
     if (statusEl) {
-      statusEl.textContent = 'No se pudo abrir el chat. Intentá de nuevo.';
-      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      statusEl.textContent = 'Error al abrir chat: ' + (e?.message || 'intentá de nuevo.');
+      setTimeout(() => { statusEl.textContent = ''; }, 5000);
     }
   } finally {
     if (btn) {

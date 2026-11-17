@@ -112,6 +112,8 @@
       document.querySelectorAll('video, audio').forEach(function (m) {
         // Las llamadas usan audio/video en vivo: no se tocan
         if (m.srcObject) return;
+        // Los medios de Loors (videos y el <audio> de música) los pausa/reanuda el motor de Loors, sincronizados
+        if (m.hasAttribute('data-og-managed') || (m.closest && m.closest('#loors-section'))) return;
         if (!m.paused) { resumeList.push(m); try { m.pause(); } catch (e) {} }
       });
     } else {

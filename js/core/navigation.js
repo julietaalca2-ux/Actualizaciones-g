@@ -9,6 +9,9 @@
    showTab, openMenuSection, closeMenuSection, openMenuSubPage, backToMainMenu
    Registra: IntersectionObserver para scroll infinito del feed y explorar, y gestos swipe */
 
+/* El que se desplaza es <main> (no la ventana): el encabezado y la barra inferior quedan fijos */
+function ogScroller() { return document.querySelector('main'); }
+
 (function initInfiniteScrollObservers() {
  const feedLoader = document.getElementById('feedLoader');
  if ('IntersectionObserver' in window && feedLoader) {
@@ -18,16 +21,17 @@
      loadMorePosts();
     }
    }
-  }, { root: null, rootMargin: '450px 0px', threshold: 0 });
+  }, { root: ogScroller(), rootMargin: '450px 0px', threshold: 0 });
   feedObserver.observe(feedLoader);
  } else {
   let scrollTicking = false;
-  window.addEventListener('scroll', () => {
+  const scroller = ogScroller();
+  scroller.addEventListener('scroll', () => {
    if (scrollTicking || !document.getElementById('feed')?.classList.contains('active')) return;
    scrollTicking = true;
    requestAnimationFrame(() => {
     scrollTicking = false;
-    if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 400) {
+    if ((scroller.clientHeight + scroller.scrollTop) >= scroller.scrollHeight - 400) {
      loadMorePosts();
     }
    });
@@ -135,11 +139,12 @@ function showTab(id, btn) {
  const feedEl = document.getElementById('feed');
  const wasFeedActive = feedEl?.classList.contains('active');
  if (wasFeedActive && id !== 'feed') {
-  feedScrollPosition = window.scrollY || 0;
+  feedScrollPosition = ogScroller().scrollTop || 0;
  }
 
  document.querySelectorAll('main>div').forEach(x => x.classList.remove('active'));
  document.getElementById(id).classList.add('active');
+ document.body.dataset.tab = id; // permite que CSS cambie el encabezado según la pestaña (Explorar)
  document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
 
  if (btn) {
@@ -204,12 +209,12 @@ function showTab(id, btn) {
  if (id === 'feed') {
   if (wasFeedActive && btn) {
    feedScrollPosition = 0;
-   window.scrollTo({ top: 0, behavior: 'smooth' });
+   ogScroller().scrollTo({ top: 0, behavior: 'smooth' });
   } else {
-   requestAnimationFrame(() => window.scrollTo(0, feedScrollPosition || 0));
+   requestAnimationFrame(() => { ogScroller().scrollTop = feedScrollPosition || 0; });
   }
  } else {
-  window.scrollTo(0, 0);
+  ogScroller().scrollTop = 0;
  }
 }
 
@@ -247,3 +252,19 @@ function backToMainMenu(currentPageId) {
  document.getElementById(currentPageId).classList.remove('active');
  document.getElementById('menuSectionPage').classList.add('active');
 }
+
+/* Pantallas completas (menú, chat): viven dentro de <main>; al abrirlas se lleva <main> arriba del todo
+   para que queden perfectamente alineadas con la pantalla. */
+(function watchFullscreenViews() {
+ const main = ogScroller();
+ if (!main || !('MutationObserver' in window)) return;
+ const sel = '.fullscreen-menu-view, #chatRoomPage, #chatDetailsPage, #chatSubSettingsPage';
+ new MutationObserver(muts => {
+  for (const m of muts) {
+   if (m.target.parentElement === main && m.target.matches(sel) && m.target.classList.contains('active')) {
+    main.scrollTop = 0;
+    break;
+   }
+  }
+ }).observe(main, { attributes: true, attributeFilter: ['class'], subtree: true });
+})();

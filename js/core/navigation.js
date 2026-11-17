@@ -1,18 +1,39 @@
-/* Depende de: state.js (currentUser, touchStartX, touchStartY, touchEndX, touchEndY,
-   isSwipeLocked, swipeNavigationFlow); core/pwa.js (updatePwaInstallButtonsVisibility)
-   En tiempo de ejecución usa funciones de features/: loadMorePosts, showAuthOverlay,
-   openCameraModal, loadActivity, loadExploreGrid, resetExploreSearch, loadConversations,
-   loadMyPostsGrid, loadSavedPostsProfileGrid, loadHighlights, loadMenuPreferences,
-   loadUserOwnActivity, loadSavedPostsGrid, populateAccountCenter
+/* Depende de: state.js (currentUser, feedScrollPosition, touchStartX, touchStartY,
+   touchEndX, touchEndY, isSwipeLocked, swipeNavigationFlow);
+   core/pwa.js (updatePwaInstallButtonsVisibility)
+   En tiempo de ejecución usa funciones de features/: loadMorePosts, loadMoreExploreGrid,
+   showAuthOverlay, openCameraModal, loadActivity, loadExploreGrid, resetExploreSearch,
+   loadConversations, loadMyPostsGrid, loadSavedPostsProfileGrid, loadHighlights,
+   loadMenuPreferences, loadUserOwnActivity, loadSavedPostsGrid, populateAccountCenter
    Expone: isAnyModalOrSubViewOpen, applySwipeEntranceAnimation, handleSwipeGesture,
    showTab, openMenuSection, closeMenuSection, openMenuSubPage, backToMainMenu
-   Registra: scroll infinito del feed y gestos swipe */
-window.addEventListener('scroll', () => {
- if (!document.getElementById('feed').classList.contains('active')) return;
- if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 300) {
-  loadMorePosts();
+   Registra: IntersectionObserver para scroll infinito del feed y explorar, y gestos swipe */
+
+(function initInfiniteScrollObservers() {
+ const feedLoader = document.getElementById('feedLoader');
+ if ('IntersectionObserver' in window && feedLoader) {
+  const feedObserver = new IntersectionObserver(entries => {
+   for (const entry of entries) {
+    if (entry.isIntersecting && document.getElementById('feed')?.classList.contains('active')) {
+     loadMorePosts();
+    }
+   }
+  }, { root: null, rootMargin: '450px 0px', threshold: 0 });
+  feedObserver.observe(feedLoader);
+ } else {
+  let scrollTicking = false;
+  window.addEventListener('scroll', () => {
+   if (scrollTicking || !document.getElementById('feed')?.classList.contains('active')) return;
+   scrollTicking = true;
+   requestAnimationFrame(() => {
+    scrollTicking = false;
+    if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 400) {
+     loadMorePosts();
+    }
+   });
+  }, { passive: true });
  }
-}, { passive: true });
+})();
 
 function isAnyModalOrSubViewOpen() {
  const modalIds = ['postDetailModal', 'editProfileModal', 'storyViewer', 'cameraModal', 'logoutConfirmModal', 'highlightModal', 'highlightViewer', 'addToHighlightModal', 'iosInstallModal'];
@@ -103,6 +124,12 @@ function showTab(id, btn) {
   return;
  }
 
+ const feedEl = document.getElementById('feed');
+ const wasFeedActive = feedEl?.classList.contains('active');
+ if (wasFeedActive && id !== 'feed') {
+  feedScrollPosition = window.scrollY || 0;
+ }
+
  document.querySelectorAll('main>div').forEach(x => x.classList.remove('active'));
  document.getElementById(id).classList.add('active');
  document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
@@ -156,7 +183,17 @@ function showTab(id, btn) {
   loadSavedPostsProfileGrid();
   loadHighlights(currentUser.id, 'highlightsScrollContainer');
  }
- window.scrollTo(0, 0);
+
+ if (id === 'feed') {
+  if (wasFeedActive && btn) {
+   feedScrollPosition = 0;
+   window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+   requestAnimationFrame(() => window.scrollTo(0, feedScrollPosition || 0));
+  }
+ } else {
+  window.scrollTo(0, 0);
+ }
 }
 
 function openMenuSection() {
@@ -193,4 +230,3 @@ function backToMainMenu(currentPageId) {
  document.getElementById(currentPageId).classList.remove('active');
  document.getElementById('menuSectionPage').classList.add('active');
 }
-

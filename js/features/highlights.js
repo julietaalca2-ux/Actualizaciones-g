@@ -457,10 +457,14 @@ async function loadHighlights(userId, containerId) {
  const container = document.getElementById(containerId);
  if (!container || !userId) return;
 
+ let prevSig = null;
  if (Array.isArray(highlightsCacheByUser[userId])) {
-  renderHighlightsListToDOM(highlightsCacheByUser[userId], userId, container);
+  prevSig = JSON.stringify(highlightsCacheByUser[userId]);
+  if (container.childElementCount === 0) renderHighlightsListToDOM(highlightsCacheByUser[userId], userId, container);
  }
 
  const highlights = await fetchUserHighlightsFromSupabase(userId);
+ // Sin cambios y ya dibujado: no se redibuja
+ if (prevSig !== null && container.childElementCount > 0 && prevSig === JSON.stringify(highlights)) return;
  renderHighlightsListToDOM(highlights, userId, container);
 }

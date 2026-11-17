@@ -8,23 +8,51 @@
    handleExploreSearchInput, resetExploreSearch, switchSearchTab, executeAdvancedSearch */
 
 let exploreObserverInitialized = false;
+let exploreThumbSupported = true;   // pasa a false si la columna thumbnail_url no existe en Supabase
+const EXPLORE_LOOR_FIELDS_THUMB = 'id, user_id, video_url, thumbnail_url, views_count, created_at';
+const EXPLORE_LOOR_FIELDS_BASE = 'id, user_id, video_url, views_count, created_at';
+
+/* Pide loors con miniatura; si la columna no existe, repite sin ella (nunca deja la grilla vacía) */
+async function queryExploreLoors(build) {
+ if (exploreThumbSupported) {
+  const res = await build(EXPLORE_LOOR_FIELDS_THUMB);
+  if (!res.error) return res;
+  exploreThumbSupported = false;
+ }
+ return build(EXPLORE_LOOR_FIELDS_BASE);
+}
+let exploreLastLoad = 0;      // cuándo se pidió la primera página por última vez
+let exploreRenderedSig = '';   // firma de lo que ya está dibujado (evita redibujar lo mismo)
+const EXPLORE_REFRESH_MS = 45000;
+
+function exploreSignature(entries) {
+ return entries.map(e => (e._type || 'p') + e.id).join(',');
+}
 
 /* ---- Videos (Loors) dentro de Explorar: se reproducen solos, sin sonido, estilo Instagram ----
    Un video empieza a reproducirse en cuanto se ve aunque sea un pedacito (arriba o abajo de la pantalla).
    Si hay muchos a la vez, suenan los más cercanos al centro de la pantalla. */
 const EXPLORE_LOORS_PAGE_SIZE = 12;
-const EXPLORE_MAX_PLAYING = 8;           // máximo de videos reproduciéndose a la vez (cuida batería y datos)
+const EXPLORE_MAX_PLAYING = 3;           // pocos videos a la vez: los decodificadores del teléfono son limitados
+const EXPLORE_MAX_ATTACHED = 9;          // máximo de videos con archivo cargado en memoria
+const exploreAttached = [];              // orden en que se cargaron (para liberar los más viejos)
 const exploreVisibleVideos = new Set();  // videos que tienen aunque sea un pedacito en pantalla
 let exploreVideoLoadObserver = null;
 let exploreVideoViewObserver = null;
 let exploreVideosSuspended = false;
 let exploreUpdateQueued = false;
 
+let exploreDataSaverCache = { v: false, t: 0 };
 function isExploreDataSaverOn() {
+ const now = Date.now();
+ if (now - exploreDataSaverCache.t < 3000) return exploreDataSaverCache.v;
+ let v = false;
  try {
   const raw = localStorage.getItem('og_user_settings_' + (currentUser?.id || 'guest'));
-  return raw ? JSON.parse(raw).dataSaver === true : false;
- } catch (e) { return false; }
+  v = raw ? JSON.parse(raw).dataSaver === true : false;
+ } catch (e) {}
+ exploreDataSaverCache = { v, t: now };
+ return v;
 }
 
 function isExploreVisible() {
@@ -35,10 +63,27 @@ function stopExploreVideo(video) {
  try { video.pause(); } catch (e) {}
 }
 
+function detachExploreVideoSource(video) {
+ try { video.pause(); } catch (e) {}
+ video.removeAttribute('src');
+ video.load();
+ const i = exploreAttached.indexOf(video);
+ if (i >= 0) exploreAttached.splice(i, 1);
+ // Cuando vuelva a acercarse a la pantalla se carga de nuevo
+ if (video.isConnected && exploreVideoLoadObserver && !video.dataset.hasThumb) exploreVideoLoadObserver.observe(video);
+}
+
 function attachExploreVideoSource(video) {
  if (video.dataset.src && !video.getAttribute('src')) {
   video.src = video.dataset.src;
   video.load();
+  exploreAttached.push(video);
+  // Si hay demasiados cargados, se sueltan los más viejos que no se están viendo
+  while (exploreAttached.length > EXPLORE_MAX_ATTACHED) {
+   const idx = exploreAttached.findIndex(v => v !== video && !exploreVisibleVideos.has(v));
+   if (idx === -1) break;
+   detachExploreVideoSource(exploreAttached[idx]);
+  }
  }
 }
 
@@ -60,7 +105,10 @@ function updateExplorePlayback() {
  const toPlay = new Set(canPlay ? candidates.slice(0, EXPLORE_MAX_PLAYING).map(c => c.video) : []);
 
  exploreVisibleVideos.forEach(video => {
-  if (!toPlay.has(video)) stopExploreVideo(video);
+  if (toPlay.has(video)) return;
+  stopExploreVideo(video);
+  // Con miniatura no hace falta tener el video cargado: se libera y se ve la foto
+  if (video.dataset.hasThumb && video.getAttribute('src')) detachExploreVideoSource(video);
  });
  toPlay.forEach(video => {
   attachExploreVideoSource(video);
@@ -80,6 +128,16 @@ function scheduleExplorePlayback() {
  });
 }
 
+// Durante el scroll no hace falta recalcular en cada cuadro: cada ~150 ms alcanza
+let exploreScrollTimer = null;
+function scheduleExplorePlaybackThrottled() {
+ if (exploreScrollTimer) return;
+ exploreScrollTimer = setTimeout(() => {
+  exploreScrollTimer = null;
+  scheduleExplorePlayback();
+ }, 150);
+}
+
 function ensureExploreVideoObservers() {
  if (exploreVideoViewObserver || !('IntersectionObserver' in window)) return;
 
@@ -91,7 +149,7 @@ function ensureExploreVideoObservers() {
     exploreVideoLoadObserver.unobserve(entry.target);
    }
   });
- }, { rootMargin: '400px 0px', threshold: 0 });
+ }, { rootMargin: '250px 0px', threshold: 0 });
 
  // 2) Controla cuáles se ven en pantalla (con ver 1 píxel ya cuenta)
  exploreVideoViewObserver = new IntersectionObserver(entries => {
@@ -105,11 +163,11 @@ function ensureExploreVideoObservers() {
    }
   });
   scheduleExplorePlayback();
- }, { threshold: [0, 0.01, 0.25] });
+ }, { threshold: [0, 0.01] });
 
  // Al hacer scroll cambia cuál está más cerca del centro
  document.addEventListener('scroll', () => {
-  if (exploreVisibleVideos.size) scheduleExplorePlayback();
+  if (exploreVisibleVideos.size && isExploreVisible()) scheduleExplorePlaybackThrottled();
  }, { capture: true, passive: true });
  window.addEventListener('resize', scheduleExplorePlayback);
 }
@@ -121,6 +179,8 @@ function releaseExploreVideos(root) {
   if (exploreVideoLoadObserver) exploreVideoLoadObserver.unobserve(video);
   exploreVisibleVideos.delete(video);
   stopExploreVideo(video);
+  const ai = exploreAttached.indexOf(video);
+  if (ai >= 0) exploreAttached.splice(ai, 1);
   video.removeAttribute('src');
   video.load();
  });
@@ -166,9 +226,17 @@ function buildExploreLoorItem(loor, tall, tallRight) {
  video.setAttribute('playsinline', '');
  video.setAttribute('muted', '');
  video.disablePictureInPicture = true;
- video.preload = 'metadata';
- // #t=0.1 hace que se vea el primer cuadro mientras no se reproduce
- video.dataset.src = loor.video_url + '#t=0.1';
+ if (loor.thumbnail_url) {
+  // Con miniatura: se ve la foto liviana y el video solo se carga cuando le toca reproducirse
+  video.poster = loor.thumbnail_url;
+  video.preload = 'none';
+  video.dataset.hasThumb = '1';
+  video.dataset.src = loor.video_url;
+ } else {
+  video.preload = 'metadata';
+  // #t=0.1 hace que se vea el primer cuadro mientras no se reproduce
+  video.dataset.src = loor.video_url + '#t=0.1';
+ }
  item.append(video);
 
  const badge = document.createElement('div');
@@ -183,7 +251,7 @@ function buildExploreLoorItem(loor, tall, tallRight) {
 
  ensureExploreVideoObservers();
  if (exploreVideoViewObserver) {
-  exploreVideoLoadObserver.observe(video);
+  if (!video.dataset.hasThumb) exploreVideoLoadObserver.observe(video);
   exploreVideoViewObserver.observe(video);
  } else {
   // Navegadores sin IntersectionObserver: se carga y se reproduce directo
@@ -243,10 +311,10 @@ async function fetchExplorePage(page) {
    .select(POST_SELECT_FIELDS)
    .order('created_at', { ascending: false })
    .range(from, from + EXPLORE_PAGE_SIZE - 1),
-  db.from('loors')
-   .select('id, user_id, video_url, views_count, created_at')
+  queryExploreLoors(fields => db.from('loors')
+   .select(fields)
    .order('created_at', { ascending: false })
-   .range(page * EXPLORE_LOORS_PAGE_SIZE, (page + 1) * EXPLORE_LOORS_PAGE_SIZE - 1)
+   .range(page * EXPLORE_LOORS_PAGE_SIZE, (page + 1) * EXPLORE_LOORS_PAGE_SIZE - 1))
  ]);
  const posts = postsRes.data || [];
  const loors = (loorsRes.data || []).filter(l => l.video_url);
@@ -300,26 +368,42 @@ async function loadExploreGrid() {
  if (!grid) return;
  ensureExploreScrollObserver();
 
- explorePage = 0;
- exploreHasMore = true;
-
- if (!explorePostsCache) {
-  const cached = ogCache.get('explore_posts', 1000 * 60 * 30);
-  if (Array.isArray(cached) && cached.length > 0) explorePostsCache = cached;
+ // Volver a Explorar con la grilla ya dibujada y reciente: no se toca nada, solo se reanuda
+ if (grid.childElementCount > 0 && (Date.now() - exploreLastLoad) < EXPLORE_REFRESH_MS) {
+  scheduleExplorePlayback();
+  return;
  }
- if (Array.isArray(explorePostsCache) && explorePostsCache.length > 0) {
-  renderExplorePostsToGrid(explorePostsCache, grid, true);
+
+ // Primera vez: pintar rápido desde caché
+ if (grid.childElementCount === 0) {
+  if (!explorePostsCache) {
+   const cached = ogCache.get('explore_posts', 1000 * 60 * 30);
+   if (Array.isArray(cached) && cached.length > 0) explorePostsCache = cached;
+  }
+  if (Array.isArray(explorePostsCache) && explorePostsCache.length > 0) {
+   explorePage = 0;
+   exploreHasMore = true;
+   renderExplorePostsToGrid(explorePostsCache, grid, true);
+   exploreRenderedSig = exploreSignature(explorePostsCache);
+  }
  }
 
  if (exploreLoading) return;
  exploreLoading = true;
  try {
   const { entries, hasMore } = await fetchExplorePage(0);
-  exploreHasMore = hasMore;
+  exploreLastLoad = Date.now();
   if (entries.length > 0) {
-   explorePostsCache = entries;
-   ogCache.set('explore_posts', entries);
-   renderExplorePostsToGrid(entries, grid, true);
+   const sig = exploreSignature(entries);
+   // Si no cambió nada, se deja la grilla (y sus videos) tal cual
+   if (sig !== exploreRenderedSig || grid.childElementCount === 0) {
+    explorePage = 0;
+    exploreHasMore = hasMore;
+    explorePostsCache = entries;
+    exploreRenderedSig = sig;
+    renderExplorePostsToGrid(entries, grid, true);
+    setTimeout(() => ogCache.set('explore_posts', entries), 0);
+   }
   }
  } finally {
   exploreLoading = false;
@@ -402,11 +486,11 @@ async function executeAdvancedSearch(queryText) {
    .ilike('content', `%${query}%`)
    .order('created_at', { ascending: false })
    .limit(18),
-  db.from('loors')
-   .select('id, user_id, video_url, views_count, created_at')
+  queryExploreLoors(fields => db.from('loors')
+   .select(fields)
    .ilike('description', `%${query}%`)
    .order('created_at', { ascending: false })
-   .limit(9)
+   .limit(9))
  ]);
 
  const profilesData = profilesRes.data;

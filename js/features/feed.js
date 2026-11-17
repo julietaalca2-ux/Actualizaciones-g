@@ -508,10 +508,14 @@ async function fetchAndRenderSavedGrid(gridId, emptyText) {
  if (!grid || !currentUser) return;
  const savedIds = getSavedPostIds();
  if (!savedIds.length) {
+  grid.dataset.sig = '';
   renderPostsGrid([], grid, emptyText);
   return;
  }
  const { data: posts } = await db.from('posts').select(POST_SELECT_FIELDS).in('id', savedIds);
+ const sig = (posts || []).map(p => p.id).join(',');
+ if (grid.dataset.sig === sig && grid.childElementCount > 0) return;
+ grid.dataset.sig = sig;
  renderPostsGrid(posts, grid, 'No se encontraron publicaciones guardadas.');
 }
 

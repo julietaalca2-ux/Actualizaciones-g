@@ -181,7 +181,7 @@ async function loadAccount(user) {
   updateNavAvatarUI();
   updatePwaInstallButtonsVisibility();
 
-  await Promise.all([
+  await Promise.allSettled([
    loadInitialPosts(),
    loadStoriesData(),
    loadHighlights(user.id, 'highlightsScrollContainer'),

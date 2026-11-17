@@ -19,12 +19,12 @@ function initLoors() {
   bindLoorsUIEvents();
 }
 
-async function openLoorsSection() {
+async function openLoorsSection(targetLoorId) {
   initLoors();
   const section = document.getElementById('loors-section');
   if (!section) return;
   section.classList.add('active');
-  await loadLoorsFeed();
+  await loadLoorsFeed(targetLoorId);
 }
 
 function closeLoorsSection() {
@@ -57,36 +57,128 @@ function pauseLoorCard(card) {
   if (audio) audio.pause();
 }
 
-async function loadLoorsFeed() {
+/* Paginación: se cargan LOORS_PAGE_SIZE videos por vez; al llegar al final se piden los siguientes */
+const LOORS_PAGE_SIZE = 8;
+const LOORS_FIELDS = 'id, user_id, video_url, thumbnail_url, description, hashtags, audio_url, audio_name, audio_link, views_count, created_at';
+let loorsPage = 0;
+let loorsHasMore = true;
+let loorsLoading = false;
+let loorsFeedToken = 0;
+let loorsSentinelObserver = null;
+let loorsFieldsOk = true;   // pasa a false si alguna columna de LOORS_FIELDS no existe: se usa '*'
+
+async function fetchLoorsPage(page) {
+  const from = page * LOORS_PAGE_SIZE;
+  const build = (fields) => db.from('loors').select(fields)
+    .order('created_at', { ascending: false })
+    .range(from, from + LOORS_PAGE_SIZE - 1);
+  if (loorsFieldsOk) {
+    const res = await build(LOORS_FIELDS);
+    if (!res.error) return res;
+    loorsFieldsOk = false;
+  }
+  return build('*');
+}
+
+async function loadLoorsFeed(targetLoorId) {
   const container = document.getElementById('loors-feed-container');
   if (!container) return;
+  if (loorsLoading) return;
+  loorsLoading = true;
+  const token = ++loorsFeedToken;
 
   // Detener cualquier video o audio anterior antes de recargar la lista
   document.querySelectorAll('.loor-video, .loor-audio').forEach(media => media.pause());
+  if (loorsSentinelObserver) { loorsSentinelObserver.disconnect(); loorsSentinelObserver = null; }
+  loorsPage = 0;
+  loorsHasMore = true;
 
   container.innerHTML = `<div style="color:#fff;text-align:center;margin-top:45vh;font-size:0.95rem;">Cargando LOORS...</div>`;
 
-  const { data: loors, error } = await db
-    .from('loors')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data: loors, error } = await fetchLoorsPage(0);
 
-  if (error) {
-    console.error('Error cargando loors:', error);
-    container.innerHTML = `<div style="color:#fff;text-align:center;margin-top:45vh;">Error al cargar videos.</div>`;
-    return;
+    if (token !== loorsFeedToken) return;
+
+    if (error) {
+      console.error('Error cargando loors:', error);
+      container.innerHTML = `<div style="color:#fff;text-align:center;margin-top:45vh;">Error al cargar videos.</div>`;
+      return;
+    }
+
+    if (!loors || loors.length === 0) {
+      loorsHasMore = false;
+      container.innerHTML = `
+        <div style="color:#fff;text-align:center;margin-top:38vh;padding:0 24px;">
+          <p style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Aún no hay LOORS</p>
+          <p style="font-size:0.9rem;opacity:0.75;margin-bottom:18px;">Subí el primer video vertical en ÖG.</p>
+          <button class="loor-submit-btn" style="background:#fff;color:#000;" onclick="document.getElementById('loors-upload-modal').classList.add('open')">Subir Loor</button>
+        </div>`;
+      return;
+    }
+
+    loorsHasMore = loors.length >= LOORS_PAGE_SIZE;
+    let firstBatch = loors;
+
+    // Si se tocó un video en Explorar, aparece primero
+    if (targetLoorId) {
+      const inPage = loors.find(l => String(l.id) === String(targetLoorId));
+      if (inPage) {
+        firstBatch = [inPage, ...loors.filter(l => l !== inPage)];
+      } else {
+        const one = await db.from('loors').select(loorsFieldsOk ? LOORS_FIELDS : '*').eq('id', targetLoorId).maybeSingle();
+        if (one.data) firstBatch = [one.data, ...loors];
+      }
+    }
+
+    container.innerHTML = '';
+    await renderLoorsBatch(firstBatch, container);
+    attachLoorsSentinel(container);
+  } finally {
+    loorsLoading = false;
   }
+}
 
-  if (!loors || loors.length === 0) {
-    container.innerHTML = `
-      <div style="color:#fff;text-align:center;margin-top:38vh;padding:0 24px;">
-        <p style="font-size:1.1rem;font-weight:700;margin-bottom:8px;">Aún no hay LOORS</p>
-        <p style="font-size:0.9rem;opacity:0.75;margin-bottom:18px;">Subí el primer video vertical en ÖG.</p>
-        <button class="loor-submit-btn" style="background:#fff;color:#000;" onclick="document.getElementById('loors-upload-modal').classList.add('open')">Subir Loor</button>
-      </div>`;
-    return;
+/* Pide la página siguiente cuando la persona llega al final del listado */
+async function loadMoreLoors() {
+  const container = document.getElementById('loors-feed-container');
+  if (!container || loorsLoading || !loorsHasMore) return;
+  loorsLoading = true;
+  const token = loorsFeedToken;
+  try {
+    const { data: loors, error } = await fetchLoorsPage(loorsPage + 1);
+    if (token !== loorsFeedToken) return;
+    if (error) return;
+    loorsPage++;
+    const known = new Set([...container.querySelectorAll('.loor-item')].map(c => String(c.dataset.loorId)));
+    const fresh = (loors || []).filter(l => !known.has(String(l.id)));
+    loorsHasMore = (loors || []).length >= LOORS_PAGE_SIZE;
+    if (fresh.length) await renderLoorsBatch(fresh, container);
+    attachLoorsSentinel(container);
+  } finally {
+    loorsLoading = false;
   }
+}
 
+function attachLoorsSentinel(container) {
+  if (loorsSentinelObserver) { loorsSentinelObserver.disconnect(); loorsSentinelObserver = null; }
+  container.querySelectorAll('.loors-sentinel').forEach(n => n.remove());
+  if (!loorsHasMore || !('IntersectionObserver' in window)) return;
+  // Se observa el penúltimo video: cuando se ve, ya se piden los siguientes
+  const cards = container.querySelectorAll('.loor-item');
+  const trigger = cards[Math.max(0, cards.length - 2)];
+  if (!trigger) return;
+  loorsSentinelObserver = new IntersectionObserver(entries => {
+    if (entries.some(e => e.isIntersecting)) {
+      loorsSentinelObserver.disconnect();
+      loadMoreLoors();
+    }
+  }, { root: container, threshold: 0.5 });
+  loorsSentinelObserver.observe(trigger);
+}
+
+/* Dibuja un grupo de videos (con sus perfiles, likes, comentarios y guardados) al final del listado */
+async function renderLoorsBatch(loors, container) {
   const userIds = [...new Set(loors.map(l => l.user_id))];
   const loorIds = loors.map(l => l.id);
 
@@ -123,9 +215,9 @@ async function loadLoorsFeed() {
   const savedSet = new Set((savesRes.data || []).map(s => s.loor_id));
   const followingSet = new Set((followsRes.data || []).map(f => f.following_id));
 
-  container.innerHTML = '';
+  const newCards = [];
 
-  loors.forEach(loor => {
+  loors.forEach((loor, loorIndex) => {
     const creator = profilesMap.get(loor.user_id) || {
       username: 'usuario_og',
       avatar_url: LOOR_DEFAULT_AVATAR
@@ -147,7 +239,7 @@ async function loadLoorsFeed() {
     card.dataset.loorId = loor.id;
 
     card.innerHTML = `
-      <video class="loor-video" src="${loor.video_url}" playsinline loop preload="metadata" ${loor.audio_url ? 'muted' : ''}></video>
+      <video class="loor-video" src="${loor.video_url}" ${loor.thumbnail_url ? `poster="${escapeLoorHtml(loor.thumbnail_url)}"` : ''} playsinline loop preload="${loor.thumbnail_url && loorIndex > 0 ? 'none' : 'metadata'}" ${loor.audio_url ? 'muted' : ''}></video>
       ${loor.audio_url ? `<audio class="loor-audio" src="${escapeLoorHtml(loor.audio_url)}" loop preload="none"></audio>` : ''}
       <div class="loor-pause-indicator">❚❚</div>
 
@@ -186,7 +278,7 @@ async function loadLoorsFeed() {
         <div class="loor-info-panel">
           <div class="loor-creator-row">
             <div class="loor-creator-link" data-user-id="${loor.user_id}">
-              <img class="loor-avatar" src="${escapeLoorHtml(creator.avatar_url || '') || LOOR_DEFAULT_AVATAR}" alt="${escapeLoorHtml(creator.username)}" onerror="this.onerror=null;this.src=LOOR_DEFAULT_AVATAR">
+              <img class="loor-avatar" loading="lazy" decoding="async" src="${escapeLoorHtml(creator.avatar_url || '') || LOOR_DEFAULT_AVATAR}" alt="${escapeLoorHtml(creator.username)}" onerror="this.onerror=null;this.src=LOOR_DEFAULT_AVATAR">
               <span class="loor-username">@${escapeLoorHtml(creator.username)}</span>
             </div>
             ${!isOwnVideo ? `
@@ -247,12 +339,19 @@ async function loadLoorsFeed() {
     });
 
     container.appendChild(card);
+    newCards.push(card);
   });
 
-  setupLoorAutoplayObserver();
+  setupLoorAutoplayObserver(newCards);
 }
 
-function setupLoorAutoplayObserver() {
+/* Si ya existe el observador solo se agregan los videos nuevos (al cargar más páginas) */
+function setupLoorAutoplayObserver(newCards) {
+  const container = document.getElementById('loors-feed-container');
+  if (loorVideoObserver && newCards && loorVideoObserver.root === container) {
+    newCards.forEach(item => loorVideoObserver.observe(item));
+    return;
+  }
   if (loorVideoObserver) loorVideoObserver.disconnect();
 
   loorVideoObserver = new IntersectionObserver((entries) => {
@@ -283,7 +382,7 @@ function setupLoorAutoplayObserver() {
     threshold: 0.75
   });
 
-  document.querySelectorAll('.loor-item').forEach(item => loorVideoObserver.observe(item));
+  (newCards || document.querySelectorAll('.loor-item')).forEach(item => loorVideoObserver.observe(item));
 }
 
 async function incrementLoorViews(loorId, card) {
@@ -413,11 +512,15 @@ async function openLoorCommentsModal(loorId) {
   modal.classList.add('open');
   list.innerHTML = '<p style="text-align:center;color:#666;">Cargando comentarios...</p>';
 
-  const { data: comments } = await db
+  let { data: comments, error: commentsErr } = await db
     .from('loor_comments')
-    .select('*')
+    .select('id, user_id, content, created_at')
     .eq('loor_id', loorId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (commentsErr) {
+    ({ data: comments } = await db.from('loor_comments').select('*').eq('loor_id', loorId).order('created_at', { ascending: true }).limit(200));
+  }
 
   if (!comments || comments.length === 0) {
     list.innerHTML = '<p style="text-align:center;color:#888;margin-top:20px;">Aún no hay comentarios.</p>';
@@ -436,7 +539,7 @@ async function openLoorCommentsModal(loorId) {
     const u = pMap.get(c.user_id) || { username: 'usuario', avatar_url: LOOR_DEFAULT_AVATAR };
     return `
       <div class="loor-comment-item">
-        <img src="${u.avatar_url || LOOR_DEFAULT_AVATAR}" alt="">
+        <img src="${u.avatar_url || LOOR_DEFAULT_AVATAR}" alt="" loading="lazy" decoding="async">
         <div>
           <strong>@${escapeLoorHtml(u.username)}</strong>
           <p style="margin:2px 0 0;">${escapeLoorHtml(c.content)}</p>
@@ -444,6 +547,43 @@ async function openLoorCommentsModal(loorId) {
       </div>
     `;
   }).join('');
+}
+
+/* Saca un cuadro del video (miniatura liviana) para que Explorar no tenga que cargar el video entero */
+function makeLoorThumbnail(file) {
+  return new Promise(resolve => {
+    let done = false;
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    const finish = blob => {
+      if (done) return;
+      done = true;
+      URL.revokeObjectURL(url);
+      video.removeAttribute('src');
+      video.load();
+      resolve(blob || null);
+    };
+    const timer = setTimeout(() => finish(null), 8000);
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.onerror = () => { clearTimeout(timer); finish(null); };
+    video.onloadedmetadata = () => {
+      try { video.currentTime = Math.min(0.4, (video.duration || 1) / 2); } catch (err) { finish(null); }
+    };
+    video.onseeked = () => {
+      try {
+        const w = 360;
+        const ratio = (video.videoHeight || 640) / (video.videoWidth || 360);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = Math.round(w * ratio);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(b => { clearTimeout(timer); finish(b); }, 'image/jpeg', 0.7);
+      } catch (err) { clearTimeout(timer); finish(null); }
+    };
+    video.src = url;
+  });
 }
 
 async function handleUploadLoor(e) {
@@ -467,13 +607,26 @@ async function handleUploadLoor(e) {
 
     const { error: uploadError } = await db.storage
       .from('loors_videos')
-      .upload(filePath, file, { cacheControl: '3600', upsert: false });
+      .upload(filePath, file, { cacheControl: '31536000', upsert: false });
 
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = db.storage
       .from('loors_videos')
       .getPublicUrl(filePath);
+
+    // Miniatura (si falla, el Loor se publica igual sin ella)
+    let thumbnailUrl = null;
+    try {
+      const thumbBlob = await makeLoorThumbnail(file);
+      if (thumbBlob) {
+        const thumbPath = `${currentUser.id}/loorthumb-${Date.now()}.jpg`;
+        const { error: thumbErr } = await db.storage
+          .from('og-media')
+          .upload(thumbPath, thumbBlob, { cacheControl: '31536000', upsert: false, contentType: 'image/jpeg' });
+        if (!thumbErr) thumbnailUrl = db.storage.from('og-media').getPublicUrl(thumbPath).data.publicUrl;
+      }
+    } catch (thumbCatch) { console.warn('Sin miniatura:', thumbCatch); }
 
     const hashtagsArray = tagsRaw
       .split(/[\s,]+/)
@@ -495,7 +648,9 @@ async function handleUploadLoor(e) {
       newLoor.audio_link = chosenAudio.link || null;
     }
 
-    const { error: dbError } = await db.from('loors').insert(newLoor);
+    let { error: dbError } = await db.from('loors').insert(thumbnailUrl ? { ...newLoor, thumbnail_url: thumbnailUrl } : newLoor);
+    // Si la columna thumbnail_url todavía no existe en Supabase, se publica sin ella
+    if (dbError && thumbnailUrl) ({ error: dbError } = await db.from('loors').insert(newLoor));
 
     if (dbError) throw dbError;
 

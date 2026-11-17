@@ -204,6 +204,12 @@ async function saveFullProfile() {
 
 function renderMyPostsListToGrid(posts, grid) {
  document.getElementById('mypostscount').textContent = posts ? posts.length : 0;
+ // Si es exactamente lo mismo que ya está dibujado, no se redibuja
+ let pinnedRaw = '';
+ try { pinnedRaw = localStorage.getItem('og_pinned_posts_' + currentUser.id) || ''; } catch (e) {}
+ const sig = (posts || []).map(p => p.id + ':' + (p.image_url ? 1 : 0)).join(',') + '|' + pinnedRaw;
+ if (grid.dataset.sig === sig && grid.childElementCount > 0) return;
+ grid.dataset.sig = sig;
  grid.replaceChildren();
 
  if (!posts || !posts.length) {
@@ -277,7 +283,7 @@ async function loadMyPostsGrid() {
 
  const grid = document.getElementById('mypostsgrid');
  const cachedMyPosts = ogCache.get(`user_posts_${currentUser.id}`, 1000 * 60 * 60 * 12);
- if (Array.isArray(cachedMyPosts)) {
+ if (Array.isArray(cachedMyPosts) && grid.childElementCount === 0) {
   renderMyPostsListToGrid(cachedMyPosts, grid);
  }
 

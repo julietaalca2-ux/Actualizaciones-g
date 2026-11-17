@@ -9,14 +9,16 @@
 
 let exploreObserverInitialized = false;
 
-/* ---- Videos (Loors) dentro de Explorar: se reproducen solos, sin sonido, estilo Instagram ---- */
+/* ---- Videos (Loors) dentro de Explorar: se reproducen solos, sin sonido, estilo Instagram ----
+   Un video empieza a reproducirse en cuanto se ve aunque sea un pedacito (arriba o abajo de la pantalla).
+   Si hay muchos a la vez, suenan los más cercanos al centro de la pantalla. */
 const EXPLORE_LOORS_PAGE_SIZE = 12;
-const EXPLORE_MAX_PLAYING = 6;      // máximo de videos sonando a la vez (cuida batería y datos)
-const EXPLORE_PLAY_RATIO = 0.12;    // con ver ~12 % del recuadro ya empieza a reproducirse
-const explorePlayingVideos = [];
+const EXPLORE_MAX_PLAYING = 8;           // máximo de videos reproduciéndose a la vez (cuida batería y datos)
+const exploreVisibleVideos = new Set();  // videos que tienen aunque sea un pedacito en pantalla
 let exploreVideoLoadObserver = null;
-let exploreVideoPlayObserver = null;
+let exploreVideoViewObserver = null;
 let exploreVideosSuspended = false;
+let exploreUpdateQueued = false;
 
 function isExploreDataSaverOn() {
  try {
@@ -30,34 +32,56 @@ function isExploreVisible() {
 }
 
 function stopExploreVideo(video) {
- video.pause();
- const idx = explorePlayingVideos.indexOf(video);
- if (idx !== -1) explorePlayingVideos.splice(idx, 1);
-}
-
-function playExploreVideo(video) {
- if (exploreVideosSuspended || isExploreDataSaverOn() || !isExploreVisible()) return;
- if (!video.src) attachExploreVideoSource(video);
- const idx = explorePlayingVideos.indexOf(video);
- if (idx !== -1) explorePlayingVideos.splice(idx, 1);
- explorePlayingVideos.push(video);
- // Si hay demasiados, se detiene el que lleva más tiempo reproduciéndose
- while (explorePlayingVideos.length > EXPLORE_MAX_PLAYING) {
-  explorePlayingVideos.shift().pause();
- }
- const p = video.play();
- if (p && p.catch) p.catch(() => {});
+ try { video.pause(); } catch (e) {}
 }
 
 function attachExploreVideoSource(video) {
- if (video.dataset.src && !video.src) {
+ if (video.dataset.src && !video.getAttribute('src')) {
   video.src = video.dataset.src;
   video.load();
  }
 }
 
+/* Decide qué videos suenan ahora: los visibles más cercanos al centro de la pantalla */
+function updateExplorePlayback() {
+ const canPlay = !exploreVideosSuspended && !isExploreDataSaverOn() && isExploreVisible();
+ const vh = window.innerHeight || document.documentElement.clientHeight;
+ const center = vh / 2;
+ const candidates = [];
+
+ exploreVisibleVideos.forEach(video => {
+  if (!video.isConnected) { exploreVisibleVideos.delete(video); return; }
+  const r = video.getBoundingClientRect();
+  if (r.bottom <= 0 || r.top >= vh) return;
+  candidates.push({ video, dist: Math.abs((r.top + r.bottom) / 2 - center) });
+ });
+ candidates.sort((x, y) => x.dist - y.dist);
+
+ const toPlay = new Set(canPlay ? candidates.slice(0, EXPLORE_MAX_PLAYING).map(c => c.video) : []);
+
+ exploreVisibleVideos.forEach(video => {
+  if (!toPlay.has(video)) stopExploreVideo(video);
+ });
+ toPlay.forEach(video => {
+  attachExploreVideoSource(video);
+  if (video.paused) {
+   const p = video.play();
+   if (p && p.catch) p.catch(() => {});
+  }
+ });
+}
+
+function scheduleExplorePlayback() {
+ if (exploreUpdateQueued) return;
+ exploreUpdateQueued = true;
+ requestAnimationFrame(() => {
+  exploreUpdateQueued = false;
+  updateExplorePlayback();
+ });
+}
+
 function ensureExploreVideoObservers() {
- if (exploreVideoPlayObserver || !('IntersectionObserver' in window)) return;
+ if (exploreVideoViewObserver || !('IntersectionObserver' in window)) return;
 
  // 1) Carga el video un poco antes de que aparezca en pantalla
  exploreVideoLoadObserver = new IntersectionObserver(entries => {
@@ -67,36 +91,54 @@ function ensureExploreVideoObservers() {
     exploreVideoLoadObserver.unobserve(entry.target);
    }
   });
- }, { rootMargin: '300px 0px', threshold: 0 });
+ }, { rootMargin: '400px 0px', threshold: 0 });
 
- // 2) Reproduce al ver solo una parte del recuadro y pausa cuando sale de pantalla
- exploreVideoPlayObserver = new IntersectionObserver(entries => {
+ // 2) Controla cuáles se ven en pantalla (con ver 1 píxel ya cuenta)
+ exploreVideoViewObserver = new IntersectionObserver(entries => {
   entries.forEach(entry => {
    const video = entry.target;
-   if (entry.isIntersecting && entry.intersectionRatio >= EXPLORE_PLAY_RATIO) playExploreVideo(video);
-   else stopExploreVideo(video);
+   if (entry.isIntersecting) {
+    exploreVisibleVideos.add(video);
+   } else {
+    exploreVisibleVideos.delete(video);
+    stopExploreVideo(video);
+   }
   });
- }, { threshold: [0, EXPLORE_PLAY_RATIO, 0.5, 1] });
+  scheduleExplorePlayback();
+ }, { threshold: [0, 0.01, 0.25] });
+
+ // Al hacer scroll cambia cuál está más cerca del centro
+ document.addEventListener('scroll', () => {
+  if (exploreVisibleVideos.size) scheduleExplorePlayback();
+ }, { capture: true, passive: true });
+ window.addEventListener('resize', scheduleExplorePlayback);
+}
+
+/* Libera los videos de una grilla que se va a redibujar */
+function releaseExploreVideos(root) {
+ root.querySelectorAll('video.explore-grid-video').forEach(video => {
+  if (exploreVideoViewObserver) exploreVideoViewObserver.unobserve(video);
+  if (exploreVideoLoadObserver) exploreVideoLoadObserver.unobserve(video);
+  exploreVisibleVideos.delete(video);
+  stopExploreVideo(video);
+  video.removeAttribute('src');
+  video.load();
+ });
 }
 
 function pauseExploreVideos() {
  exploreVideosSuspended = true;
- [...explorePlayingVideos].forEach(stopExploreVideo);
+ exploreVisibleVideos.forEach(stopExploreVideo);
 }
 
 function resumeExploreVideos() {
  exploreVideosSuspended = false;
- // Volver a evaluar qué videos están visibles
- if (!exploreVideoPlayObserver) return;
- document.querySelectorAll('#explore video.explore-grid-video').forEach(v => {
-  exploreVideoPlayObserver.unobserve(v);
-  exploreVideoPlayObserver.observe(v);
- });
+ scheduleExplorePlayback();
 }
 
 document.addEventListener('visibilitychange', () => {
- if (document.hidden) [...explorePlayingVideos].forEach(stopExploreVideo);
- else if (!exploreVideosSuspended) resumeExploreVideos();
+ if (document.hidden) exploreVisibleVideos.forEach(stopExploreVideo);
+ else scheduleExplorePlayback();
 });
 
 function formatExploreCount(n) {
@@ -108,9 +150,9 @@ function formatExploreCount(n) {
 
 const EXPLORE_EYE_SVG = '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
 
-function buildExploreLoorItem(loor, tall) {
+function buildExploreLoorItem(loor, tall, tallRight) {
  const item = document.createElement('div');
- item.className = 'explore-grid-item explore-grid-item--video' + (tall ? ' explore-grid-item--tall' : '');
+ item.className = 'explore-grid-item explore-grid-item--video' + (tall ? ' explore-grid-item--tall' : '') + (tall && tallRight ? ' explore-grid-item--tall-right' : '');
  item.onclick = () => {
   if (typeof openLoorsSection === 'function') openLoorsSection(loor.id);
  };
@@ -140,10 +182,12 @@ function buildExploreLoorItem(loor, tall) {
  item.append(reel);
 
  ensureExploreVideoObservers();
- if (exploreVideoLoadObserver) {
+ if (exploreVideoViewObserver) {
   exploreVideoLoadObserver.observe(video);
-  exploreVideoPlayObserver.observe(video);
+  exploreVideoViewObserver.observe(video);
  } else {
+  // Navegadores sin IntersectionObserver: se carga y se reproduce directo
+  video.autoplay = true;
   attachExploreVideoSource(video);
  }
  return item;
@@ -160,7 +204,8 @@ function buildExplorePostItem(post) {
   img.decoding = 'async';
   item.append(img);
  } else {
-  item.textContent = (post.content || '').slice(0, 45);
+  item.classList.add('explore-grid-item--text');
+  item.textContent = (post.content || '').slice(0, 60);
  }
  const badge = document.createElement('div');
  badge.className = 'explore-grid-badge';
@@ -172,9 +217,11 @@ function buildExplorePostItem(post) {
 let exploreLoorCounter = 0;
 function buildExploreGridItem(entry) {
  if (entry && entry._type === 'loor') {
-  // Cada tercer video se muestra grande (2 filas), como en Instagram
-  const tall = (exploreLoorCounter++ % 3) === 0;
-  return buildExploreLoorItem(entry, tall);
+  // Cada tercer video se muestra grande (2 filas) y alterna izquierda/derecha, como en Instagram
+  const n = exploreLoorCounter++;
+  const tall = (n % 3) === 0;
+  const tallRight = (Math.floor(n / 3) % 2) === 1;
+  return buildExploreLoorItem(entry, tall, tallRight);
  }
  return buildExplorePostItem(entry);
 }
@@ -213,7 +260,7 @@ function renderExplorePostsToGrid(posts, grid, reset = true) {
  if (!grid) return;
  if (reset) {
   // Al redibujar, se sueltan los videos anteriores
-  [...explorePlayingVideos].forEach(stopExploreVideo);
+  releaseExploreVideos(grid);
   exploreLoorCounter = 0;
  }
  if (!posts || !posts.length) {
@@ -224,6 +271,7 @@ function renderExplorePostsToGrid(posts, grid, reset = true) {
  posts.forEach(post => fragment.append(buildExploreGridItem(post)));
  if (reset) grid.replaceChildren(fragment);
  else grid.append(fragment);
+ scheduleExplorePlayback();
 }
 
 function ensureExploreScrollObserver() {
@@ -327,7 +375,9 @@ function resetExploreSearch() {
  document.getElementById('searchCategoriesBar').classList.remove('active');
  document.getElementById('exploreDefaultView').classList.add('active');
  document.getElementById('exploreSearchResultsView').classList.remove('active');
- document.getElementById('searchForYouResults').replaceChildren();
+ const forYouGrid = document.getElementById('searchForYouResults');
+ releaseExploreVideos(forYouGrid);
+ forYouGrid.replaceChildren();
  document.getElementById('searchProfilesResults').replaceChildren();
 }
 
@@ -387,6 +437,7 @@ async function executeAdvancedSearch(queryText) {
 
  const postsData = mergeExploreEntries(postsRes.data, (loorsRes.data || []).filter(l => l.video_url));
  const forYouContainer = document.getElementById('searchForYouResults');
+ releaseExploreVideos(forYouContainer);
  forYouContainer.replaceChildren();
 
  if (!postsData.length) {
@@ -398,5 +449,17 @@ async function executeAdvancedSearch(queryText) {
    postsFragment.append(entry._type === 'loor' ? buildExploreLoorItem(entry, false) : buildExplorePostItem(entry));
   });
   forYouContainer.replaceChildren(postsFragment);
+  scheduleExplorePlayback();
  }
 }
+
+
+/* Buscador más limpio, como en Instagram */
+(function setExploreSearchPlaceholder() {
+ const apply = () => {
+  const input = document.getElementById('search');
+  if (input) input.setAttribute('placeholder', 'Buscar');
+ };
+ if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+ else apply();
+})();

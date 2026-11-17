@@ -71,6 +71,8 @@ function setupRealtimeNotifications() {
  if (realtimeChannel) { db.removeChannel(realtimeChannel); realtimeChannel = null; }
  if (dmRealtimeChannel) { db.removeChannel(dmRealtimeChannel); dmRealtimeChannel = null; }
  if (postsRealtimeChannel) { db.removeChannel(postsRealtimeChannel); postsRealtimeChannel = null; }
+ // Llamadas: escucha las llamadas entrantes (o se desconecta si no hay sesión)
+ if (typeof initCallSignaling === 'function') initCallSignaling();
  if (!currentUser) return;
 
  realtimeChannel = db.channel('public-notifications')

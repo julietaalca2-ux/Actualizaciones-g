@@ -1,4 +1,3 @@
-
 /* Depende de: config.js (db); state.js (currentUser, myProfile, viewedProfile, profilesCache,
    myActiveStories, storiesByUserMap, highlightsCacheByUser, cachedConversationsList,
    cachedActivityEvents, cachedFeedPosts, loadedPostIds, realtimeChannel, dmRealtimeChannel,
@@ -8,8 +7,10 @@
    En tiempo de ejecución usa funciones de features/: updateProfileUI, loadInitialPosts,
    loadStoriesData, loadHighlights, checkGlobalUnreadMessages, updateStoryUI
    Expone: switchAuthSubView, showAuthOverlay, hideAuthOverlay, hideSplashScreen,
-   executeSignUp, executeSignIn, loadAccount, promptLogoutConfirmation,
-   closeLogoutConfirmation, executeConfirmedSignOut */
+   signInWithGoogle, signInWithFacebook, executeSignUp, executeSignIn, loadAccount,
+   promptLogoutConfirmation, closeLogoutConfirmation, executeConfirmedSignOut */
+
+let loadingAccountUserId = null;
 
 function switchAuthSubView(viewName) {
  document.getElementById('authWelcomePanel').classList.remove('active');
@@ -39,7 +40,6 @@ function hideSplashScreen() {
  }
 }
 
-
 // Acceso con Google: Supabase administra el flujo OAuth y la sesión.
 async function signInWithGoogle() {
  status('authOverlayStatus', 'Conectando con Google...');
@@ -49,6 +49,26 @@ async function signInWithGoogle() {
   options: { redirectTo }
  });
  if (error) status('authOverlayStatus', 'No se pudo iniciar con Google: ' + error.message);
+}
+
+// Acceso con Facebook: Supabase administra el flujo OAuth y la sesión.
+async function signInWithFacebook() {
+ status('authOverlayStatus', 'Conectando con Facebook...');
+ const redirectTo = window.location.pathname && window.location.pathname !== '/'
+  ? window.location.origin + window.location.pathname
+  : window.location.origin;
+
+ const { data, error } = await db.auth.signInWithOAuth({
+  provider: 'facebook',
+  options: {
+   redirectTo
+  }
+ });
+
+ if (error) {
+  console.error('ÖG - Error en Facebook OAuth:', error);
+  status('authOverlayStatus', 'No se pudo iniciar con Facebook: ' + error.message);
+ }
 }
 
 async function executeSignUp() {
@@ -94,59 +114,85 @@ async function executeSignIn() {
 }
 
 async function loadAccount(user) {
- currentUser = user;
+ if (!user) return;
+ if (loadingAccountUserId === user.id) return;
+ loadingAccountUserId = user.id;
 
- let { data: profile, error } = await db
-  .from('og_profiles')
-  .select('*')
-  .eq('id', user.id)
-  .maybeSingle();
+ try {
+  currentUser = user;
 
- if (error) {
-  console.error('ÖG - Error cargando perfil:', error);
-  alert('No se pudo cargar tu perfil: ' + error.message);
-  return;
- }
-
- if (!profile) {
-  const username = user.user_metadata?.username || ('usuario_' + user.id.slice(0, 8));
-
-  const { data: created, error: createError } = await db
+  let { data: profile, error } = await db
    .from('og_profiles')
-   .insert({
-    id: user.id,
-    username,
-    display_name: username
-   })
-   .select()
-   .single();
+   .select('*')
+   .eq('id', user.id)
+   .maybeSingle();
 
-  if (createError) {
-   console.error('ÖG - Error creando perfil:', createError);
-   alert('No se pudo crear tu perfil: ' + createError.message);
+  if (error) {
+   console.error('ÖG - Error cargando perfil:', error);
+   alert('No se pudo cargar tu perfil: ' + error.message);
    return;
   }
 
-  profile = created;
+  if (!profile) {
+   const baseUsername = user.user_metadata?.username || ('usuario_' + user.id.slice(0, 8));
+   const displayName = user.user_metadata?.full_name || user.user_metadata?.name || baseUsername;
+
+   let candidateUsername = baseUsername;
+   let created = null;
+   let createError = null;
+
+   for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await db
+     .from('og_profiles')
+     .upsert(
+      {
+       id: user.id,
+       username: candidateUsername,
+       display_name: displayName
+      },
+      { onConflict: 'id' }
+     )
+     .select()
+     .single();
+
+    created = res.data;
+    createError = res.error;
+
+    if (!createError || createError.code !== '23505') break;
+
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    candidateUsername = 'usuario_' + user.id.slice(0, 6) + '_' + randomSuffix;
+   }
+
+   if (createError) {
+    console.error('ÖG - Error creando perfil:', createError);
+    alert('No se pudo crear tu perfil: ' + createError.message);
+    return;
+   }
+
+   profile = created;
+  }
+
+  myProfile = profile;
+  profilesCache[user.id] = profile;
+
+  hideAuthOverlay();
+  updateProfileUI();
+  updateNavAvatarUI();
+  updatePwaInstallButtonsVisibility();
+
+  await Promise.all([
+   loadInitialPosts(),
+   loadStoriesData(),
+   loadHighlights(user.id, 'highlightsScrollContainer'),
+   checkGlobalUnreadMessages()
+  ]);
+
+  setupRealtimeNotifications();
+  setupPresenceChannel();
+ } finally {
+  loadingAccountUserId = null;
  }
-
- myProfile = profile;
- profilesCache[user.id] = profile;
-
- hideAuthOverlay();
- updateProfileUI();
- updateNavAvatarUI();
- updatePwaInstallButtonsVisibility();
-
- await Promise.all([
-  loadInitialPosts(),
-  loadStoriesData(),
-  loadHighlights(user.id, 'highlightsScrollContainer'),
-  checkGlobalUnreadMessages()
- ]);
-
- setupRealtimeNotifications();
- setupPresenceChannel();
 }
 
 function promptLogoutConfirmation() {

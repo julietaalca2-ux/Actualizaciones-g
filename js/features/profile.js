@@ -1,10 +1,12 @@
 /* Depende de: config.js (db); state.js (currentUser, myProfile, viewedProfile, isFollowing,
-   profilesCache, stagedAvatarBlob, cachedFeedPosts); utils.js (setAvatarContent,
-   setPreviewBlobUrl, createAvatarNode, updateNavAvatarUI, renderPostsGrid);
+   profilesCache, stagedAvatarBlob, cachedFeedPosts, cachedFollowingIds, highlightsCacheByUser);
+   utils.js (setAvatarContent, setPreviewBlobUrl, revokePreviewBlobUrl, compressImageBlob,
+   createAvatarNode, updateNavAvatarUI, renderPostsGrid, ogCache, setCachedProfile,
+   PROFILE_SELECT_FIELDS, PROFILE_MINI_FIELDS, POST_SELECT_FIELDS);
    core/navigation.js (showTab)
    En tiempo de ejecución usa funciones de otros módulos: loadSavedPostsProfileGrid,
    loadInitialPosts, openPostDetail (feed.js), loadHighlights (highlights.js),
-   loadStoriesData (stories.js), openDirectChatWithUser (chat.js)
+   loadStoriesData (stories.js)
    Expone: updateProfileUI, openEditProfileModal, closeEditProfileModal, stageImage,
    saveFullProfile, loadMyPostsGrid, switchProfileTab, switchPublicProfileTab,
    shareProfileLink, openPublicProfile, loadPublicCounts, checkFollowStatus, toggleFollow,
@@ -60,32 +62,35 @@ function openEditProfileModal() {
 }
 
 function closeEditProfileModal() {
+ stagedAvatarBlob = null;
+ const previewImg = document.querySelector('#modalAvatarPreviewBox img');
+ if (previewImg) revokePreviewBlobUrl(previewImg);
  document.getElementById('editProfileModal').classList.remove('active');
 }
 
-function stageImage(type, input) {
+async function stageImage(type, input) {
  const file = input.files?.[0];
 
  if (!file) return;
+ input.value = '';
 
  if (type === 'avatar') {
   if (!file.type.startsWith('image/')) {
    alert('Seleccioná un archivo de imagen válido.');
-   input.value = '';
    return;
   }
 
-  stagedAvatarBlob = file;
+  const compressed = await compressImageBlob(file, 400, 0.84);
+  stagedAvatarBlob = compressed;
 
   const box = document.getElementById('modalAvatarPreviewBox');
   box.replaceChildren();
 
   const img = document.createElement('img');
-  setPreviewBlobUrl(img, file);
+  img.decoding = 'async';
+  setPreviewBlobUrl(img, compressed);
   box.append(img);
  }
-
- input.value = '';
 }
 
 async function saveFullProfile() {
@@ -118,13 +123,13 @@ async function saveFullProfile() {
   // SUBIR FOTO DE PERFIL
   if (stagedAvatarBlob) {
    const file = stagedAvatarBlob;
-   const extension = file.name?.split('.').pop()?.toLowerCase() || 'jpg';
+   const extension = file.type === 'image/jpeg' ? 'jpg' : (file.name?.split('.').pop()?.toLowerCase() || 'jpg');
    const path = `${currentUser.id}/avatar-${Date.now()}.${extension}`;
 
    const { error: uploadError } = await db.storage
     .from('og-media')
     .upload(path, file, {
-     contentType: file.type || 'application/octet-stream',
+     contentType: file.type || 'image/jpeg',
      upsert: false
     });
 
@@ -152,7 +157,7 @@ async function saveFullProfile() {
     avatar_url: avatarUrl
    })
    .eq('id', currentUser.id)
-   .select()
+   .select(PROFILE_SELECT_FIELDS)
    .single();
 
   if (error) {
@@ -163,9 +168,10 @@ async function saveFullProfile() {
    throw new Error('Supabase no devolvió los datos actualizados.');
   }
 
-  // ACTUALIZAR ESTADO LOCAL
+  // ACTUALIZAR ESTADO LOCAL Y CACHÉ
   myProfile = data;
-  profilesCache[currentUser.id] = data;
+  setCachedProfile(data, true);
+  ogCache.set('my_profile', data);
   stagedAvatarBlob = null;
 
   // ACTUALIZAR INTERFAZ
@@ -187,18 +193,8 @@ async function saveFullProfile() {
  }
 }
 
-async function loadMyPostsGrid() {
- if (!currentUser) return;
-
- const grid = document.getElementById('mypostsgrid');
-
- const { data: posts } = await db.from('posts')
-  .select('*')
-  .eq('user_id', currentUser.id)
-  .order('created_at', { ascending: false });
-
+function renderMyPostsListToGrid(posts, grid) {
  document.getElementById('mypostscount').textContent = posts ? posts.length : 0;
-
  grid.replaceChildren();
 
  if (!posts || !posts.length) {
@@ -207,20 +203,17 @@ async function loadMyPostsGrid() {
  }
 
  const pinnedIds = JSON.parse(localStorage.getItem('og_pinned_posts_' + currentUser.id) || '[]');
-
- posts.sort((a, b) => {
+ const sorted = [...posts].sort((a, b) => {
   const aPinned = pinnedIds.includes(a.id);
   const bPinned = pinnedIds.includes(b.id);
-
   if (aPinned && !bPinned) return -1;
   if (!aPinned && bPinned) return 1;
-
   return new Date(b.created_at) - new Date(a.created_at);
  });
 
  const fragment = document.createDocumentFragment();
 
- posts.forEach(post => {
+ sorted.forEach(post => {
   const item = document.createElement('div');
   item.className = 'ig-grid-item';
   item.onclick = () => openPostDetail(post);
@@ -257,6 +250,8 @@ async function loadMyPostsGrid() {
   if (post.image_url) {
    const img = document.createElement('img');
    img.src = post.image_url;
+   img.loading = 'lazy';
+   img.decoding = 'async';
    item.append(img);
   } else {
    item.textContent = (post.content || '').slice(0, 55);
@@ -266,6 +261,26 @@ async function loadMyPostsGrid() {
  });
 
  grid.replaceChildren(fragment);
+}
+
+async function loadMyPostsGrid() {
+ if (!currentUser) return;
+
+ const grid = document.getElementById('mypostsgrid');
+ const cachedMyPosts = ogCache.get(`user_posts_${currentUser.id}`, 1000 * 60 * 60 * 12);
+ if (Array.isArray(cachedMyPosts)) {
+  renderMyPostsListToGrid(cachedMyPosts, grid);
+ }
+
+ const { data: posts } = await db.from('posts')
+  .select(POST_SELECT_FIELDS)
+  .eq('user_id', currentUser.id)
+  .order('created_at', { ascending: false });
+
+ if (posts) {
+  ogCache.set(`user_posts_${currentUser.id}`, posts);
+  renderMyPostsListToGrid(posts, grid);
+ }
 }
 
 function switchProfileTab(tabKey) {
@@ -297,22 +312,8 @@ function shareProfileLink() {
  }
 }
 
-async function openPublicProfile(userId) {
- if (currentUser && userId === currentUser.id) {
-  showTab('profile');
-  return;
- }
-
- const { data: profile } = await db.from('og_profiles')
-  .select('*')
-  .eq('id', userId)
-  .single();
-
- if (!profile) return;
-
+function renderPublicProfileHeader(profile) {
  viewedProfile = profile;
- profilesCache[userId] = profile;
-
  document.getElementById('publicname').textContent = profile.display_name || profile.username;
  document.getElementById('publicpronouns').textContent = profile.pronouns ? `· ${profile.pronouns}` : '';
  document.getElementById('publicheadername').textContent = profile.username;
@@ -330,19 +331,51 @@ async function openPublicProfile(userId) {
  }
 
  setAvatarContent(document.getElementById('publicavatar'), profile.avatar_url);
+}
 
- const msgBtn = document.querySelector('#publicprofile .profile-action-buttons-row button.secondary');
- if (msgBtn) {
-  msgBtn.disabled = false;
-  msgBtn.textContent = 'Mensaje';
-  msgBtn.onclick = () => openDirectChatWithUser(profile.id, msgBtn);
+async function openPublicProfile(userId) {
+ if (!userId) return;
+ if (currentUser && userId === currentUser.id) {
+  showTab('profile');
+  return;
  }
 
- showTab('publicprofile');
- checkFollowStatus(userId);
- loadPublicUserPosts(userId);
- loadPublicCounts(userId);
- loadHighlights(userId, 'publicHighlightsScrollContainer');
+ // Carga instantánea desde caché de memoria/SWR si el perfil ya fue visto o precargado
+ const cachedProf = profilesCache[userId];
+ const cachedUserPosts = ogCache.get(`user_posts_${userId}`, 1000 * 60 * 60 * 6);
+
+ if (cachedProf) {
+  renderPublicProfileHeader(cachedProf);
+  showTab('publicprofile');
+  if (Array.isArray(cachedUserPosts)) {
+   document.getElementById('publicpostscount').textContent = cachedUserPosts.length;
+   renderPostsGrid(cachedUserPosts, document.getElementById('publicposts'), 'No hay publicaciones.');
+  }
+  if (Array.isArray(highlightsCacheByUser[userId])) {
+   loadHighlights(userId, 'publicHighlightsScrollContainer');
+  }
+ }
+
+ const { data: profile } = await db.from('og_profiles')
+  .select(PROFILE_SELECT_FIELDS)
+  .eq('id', userId)
+  .single();
+
+ if (!profile) return;
+
+ const merged = setCachedProfile(profile, true) || profile;
+ renderPublicProfileHeader(merged);
+
+ if (!cachedProf) {
+  showTab('publicprofile');
+ }
+
+ await Promise.all([
+  checkFollowStatus(userId),
+  loadPublicUserPosts(userId),
+  loadPublicCounts(userId),
+  loadHighlights(userId, 'publicHighlightsScrollContainer')
+ ]);
 }
 
 async function loadPublicCounts(userId) {
@@ -361,7 +394,7 @@ async function checkFollowStatus(userId) {
  if (!currentUser) return;
 
  const { data } = await db.from('follows')
-  .select('*')
+  .select('following_id')
   .eq('follower_id', currentUser.id)
   .eq('following_id', userId)
   .maybeSingle();
@@ -398,9 +431,13 @@ async function toggleFollow() {
   btn.classList.remove('primary-action');
  }
 
- loadPublicCounts(viewedProfile.id);
-
+ cachedFollowingIds = null;
+ ogCache.remove('following_ids');
  cachedFeedPosts = null;
+ ogCache.remove('feed_posts');
+
+ loadPublicCounts(viewedProfile.id);
+ loadFollowCounts();
 
  await Promise.all([
   loadInitialPosts(),
@@ -412,10 +449,13 @@ async function loadPublicUserPosts(userId) {
  const grid = document.getElementById('publicposts');
 
  const { data: posts } = await db.from('posts')
-  .select('*')
+  .select(POST_SELECT_FIELDS)
   .eq('user_id', userId)
   .order('created_at', { ascending: false });
 
+ if (posts) {
+  ogCache.set(`user_posts_${userId}`, posts);
+ }
  renderPostsGrid(posts, grid, 'No hay publicaciones.');
 }
 
@@ -466,10 +506,10 @@ async function renderUsersInFollowModal(userIds) {
 
  if (missing.length > 0) {
   const { data: profs } = await db.from('og_profiles')
-   .select('id, username, display_name, avatar_url')
+   .select(PROFILE_MINI_FIELDS)
    .in('id', missing);
 
-  (profs || []).forEach(p => profilesCache[p.id] = p);
+  (profs || []).forEach(p => setCachedProfile(p, false));
  }
 
  const fragment = document.createDocumentFragment();

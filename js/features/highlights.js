@@ -1,8 +1,10 @@
 /* Depende de: config.js (db); state.js (currentUser, myProfile, viewedProfile, profilesCache,
    highlightsCacheByUser, stagedHighlightBlob, pendingStoryImageForHighlight,
    currentHighlightItems, currentHighlightIndex, isSavingHighlight, currentActiveStoryId);
-   utils.js (setAvatarContent); features/stories.js (renderProgressSegments)
-   Expone: createNewHighlightModal, closeHighlightModal, stageHighlightCover, saveNewHighlight,
+   utils.js (setAvatarContent, compressImageBlob, ogCache);
+   features/stories.js (renderProgressSegments, setViewerImage, attachStoryViewerGestures, preloadStoryImageUrl)
+   Expone: deleteHighlightById, openHighlightManageSheet, closeHighlightManageSheet,
+   deleteCurrentHighlight, deleteCurrentHighlightPhoto, createNewHighlightModal, closeHighlightModal, stageHighlightCover, saveNewHighlight,
    fetchUserHighlightsFromSupabase, openAddToHighlightModal, closeAddToHighlightModal,
    createNewHighlightFromViewer, openHighlightViewer, renderCurrentHighlightItem,
    nextHighlightSlide, prevHighlightSlide, closeHighlightViewer, loadHighlights
@@ -24,12 +26,12 @@ function closeHighlightModal() {
  document.getElementById('highlightModal').classList.remove('active');
 }
 
-function stageHighlightCover(input) {
+async function stageHighlightCover(input) {
  const file = input.files?.[0];
  if (!file) return;
- stagedHighlightBlob = file;
- alert('Imagen de portada seleccionada.');
  input.value = '';
+ stagedHighlightBlob = await compressImageBlob(file, 1080, 0.82);
+ alert('Imagen de portada seleccionada.');
 }
 
 async function saveNewHighlight() {
@@ -67,7 +69,7 @@ async function saveNewHighlight() {
     title,
     cover_url: coverUrl
    })
-   .select()
+   .select('id, user_id, title, cover_url, created_at')
    .single();
 
   if (hlError) throw hlError;
@@ -96,6 +98,7 @@ async function saveNewHighlight() {
   }
 
   delete highlightsCacheByUser[currentUser.id];
+  ogCache.set('highlights_map', highlightsCacheByUser);
   closeHighlightModal();
   await loadHighlights(currentUser.id, 'highlightsScrollContainer');
  } catch (e) {
@@ -119,6 +122,7 @@ async function fetchUserHighlightsFromSupabase(userId) {
  if (hlErr || !highlightsData) return [];
  if (!highlightsData.length) {
   highlightsCacheByUser[userId] = [];
+  ogCache.set('highlights_map', highlightsCacheByUser);
   return [];
  }
 
@@ -130,17 +134,22 @@ async function fetchUserHighlightsFromSupabase(userId) {
   .order('created_at', { ascending: true });
 
  const itemsByHighlightId = {};
+ const itemIdsByHighlightId = {};
  (itemsData || []).forEach(it => {
   if (!itemsByHighlightId[it.highlight_id]) itemsByHighlightId[it.highlight_id] = [];
   itemsByHighlightId[it.highlight_id].push(it.image_url);
+  if (!itemIdsByHighlightId[it.highlight_id]) itemIdsByHighlightId[it.highlight_id] = [];
+  itemIdsByHighlightId[it.highlight_id].push(it.id);
  });
 
  const enriched = highlightsData.map(h => ({
   ...h,
-  items: itemsByHighlightId[h.id] || []
+  items: itemsByHighlightId[h.id] || [],
+  itemIds: itemIdsByHighlightId[h.id] || []
  }));
 
  highlightsCacheByUser[userId] = enriched;
+ ogCache.set('highlights_map', highlightsCacheByUser);
  return enriched;
 }
 
@@ -195,6 +204,7 @@ async function openAddToHighlightModal() {
    }
 
    delete highlightsCacheByUser[currentUser.id];
+   ogCache.set('highlights_map', highlightsCacheByUser);
    alert(`Agregada a "${hl.title}"`);
    closeAddToHighlightModal();
    await loadHighlights(currentUser.id, 'highlightsScrollContainer');
@@ -213,7 +223,8 @@ function createNewHighlightFromViewer() {
 }
 
 function openHighlightViewer(highlightObj, profile) {
- const items = (highlightObj.items && highlightObj.items.length > 0)
+ const hasItems = highlightObj.items && highlightObj.items.length > 0;
+ const items = hasItems
   ? highlightObj.items
   : (highlightObj.cover_url ? [highlightObj.cover_url] : []);
 
@@ -222,7 +233,10 @@ function openHighlightViewer(highlightObj, profile) {
   return;
  }
 
- currentHighlightItems = items;
+ currentHighlightObj = highlightObj;
+ currentHighlightOwnerId = highlightObj.user_id;
+ currentHighlightItems = items.slice();
+ currentHighlightItemIds = hasItems && Array.isArray(highlightObj.itemIds) ? highlightObj.itemIds.slice() : [];
  currentHighlightIndex = 0;
 
  const viewer = document.getElementById('highlightViewer');
@@ -230,14 +244,25 @@ function openHighlightViewer(highlightObj, profile) {
  document.getElementById('highlightViewerTitleText').textContent = highlightObj.title;
  setAvatarContent(document.getElementById('highlightViewerAvatarInner'), profile?.avatar_url);
 
+ // Solo el dueño ve el botón de borrar
+ const isOwner = !!currentUser && highlightObj.user_id === currentUser.id;
+ const manageBtn = document.getElementById('highlightManageBtn');
+ if (manageBtn) manageBtn.style.display = isOwner ? 'inline-flex' : 'none';
+
  renderCurrentHighlightItem();
  viewer.classList.add('active');
 }
 
 function renderCurrentHighlightItem() {
- renderProgressSegments('highlightProgressBars', currentHighlightItems.length, currentHighlightIndex);
- document.getElementById('highlightViewerImage').src = currentHighlightItems[currentHighlightIndex];
+ // La barra se llena sola en 5 s y, al terminar, pasa a la siguiente foto
+ renderProgressSegments('highlightProgressBars', currentHighlightItems.length, currentHighlightIndex, nextHighlightSlide);
+ setViewerImage('highlightViewer', document.getElementById('highlightViewerImage'), currentHighlightItems[currentHighlightIndex]);
  document.getElementById('highlightViewerCounter').textContent = `${currentHighlightIndex + 1} / ${currentHighlightItems.length}`;
+
+ const nextUrl = currentHighlightItems[currentHighlightIndex + 1];
+ if (nextUrl && typeof preloadStoryImageUrl === 'function') {
+  preloadStoryImageUrl(nextUrl);
+ }
 }
 
 function nextHighlightSlide() {
@@ -252,70 +277,116 @@ function nextHighlightSlide() {
 
 function prevHighlightSlide() {
  if (!currentHighlightItems.length) return;
- if (currentHighlightIndex > 0) {
-  currentHighlightIndex--;
-  renderCurrentHighlightItem();
- } else {
-  renderCurrentHighlightItem();
- }
+ if (currentHighlightIndex > 0) currentHighlightIndex--;
+ renderCurrentHighlightItem();
 }
 
 function closeHighlightViewer() {
+ const bars = document.getElementById('highlightProgressBars');
+ if (bars) bars.replaceChildren();
+ closeHighlightManageSheet();
  currentHighlightItems = [];
+ currentHighlightItemIds = [];
+ currentHighlightObj = null;
  currentHighlightIndex = 0;
- document.getElementById('highlightViewer').classList.remove('active');
+ const viewer = document.getElementById('highlightViewer');
+ viewer.classList.remove('active', 'is-held', 'is-loading', 'is-menu-open');
 }
 
-/* Gestos táctiles y toque en Visor de Destacadas */
-(function initHighlightViewerGestures() {
- const area = document.getElementById('highlightContentAreaContainer');
- if (!area) return;
- let startX = 0;
- let startY = 0;
+/* Gestos del Visor de Destacadas (toque, deslizar y mantener presionado para pausar) */
+attachStoryViewerGestures(
+ document.getElementById('highlightContentAreaContainer'),
+ document.getElementById('highlightViewer'),
+ { next: () => nextHighlightSlide(), prev: () => prevHighlightSlide(), close: () => closeHighlightViewer() }
+);
 
- area.addEventListener('touchstart', e => {
-  startX = e.changedTouches[0].clientX;
-  startY = e.changedTouches[0].clientY;
- }, { passive: true });
+/* ---- Borrar destacadas ---- */
+function openHighlightManageSheet() {
+ if (!currentHighlightObj) return;
+ const canDeletePhoto = currentHighlightItemIds.length > 1;
+ const photoBtn = document.getElementById('highlightDeletePhotoBtn');
+ if (photoBtn) photoBtn.style.display = currentHighlightItemIds.length > 0 ? 'block' : 'none';
+ if (photoBtn) photoBtn.textContent = canDeletePhoto ? 'Eliminar esta foto' : 'Eliminar esta foto (se borra la destacada)';
+ document.getElementById('highlightViewer').classList.add('is-menu-open');
+ document.getElementById('highlightManageSheet').classList.add('active');
+}
 
- area.addEventListener('touchend', e => {
-  const endX = e.changedTouches[0].clientX;
-  const endY = e.changedTouches[0].clientY;
-  const diffX = endX - startX;
-  const diffY = endY - startY;
+function closeHighlightManageSheet() {
+ document.getElementById('highlightManageSheet')?.classList.remove('active');
+ document.getElementById('highlightViewer')?.classList.remove('is-menu-open');
+}
 
-  if (Math.abs(diffY) > 90 && diffY > Math.abs(diffX)) {
-   closeHighlightViewer();
-   return;
-  }
+function refreshHighlightsAfterChange(userId) {
+ delete highlightsCacheByUser[userId];
+ ogCache.set('highlights_map', highlightsCacheByUser);
+ const containerId = document.getElementById('highlightsScrollContainer') ? 'highlightsScrollContainer' : null;
+ if (containerId) loadHighlights(userId, containerId);
+}
 
-  if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
-   if (diffX < 0) nextHighlightSlide();
-   else prevHighlightSlide();
-   return;
-  }
+/* Borra la destacada completa (con confirmación). Sirve desde el visor y desde el perfil. */
+async function deleteHighlightById(highlight, { skipConfirm = false } = {}) {
+ if (!currentUser || !highlight || highlight.user_id !== currentUser.id) return false;
+ if (!skipConfirm && !confirm(`¿Eliminar la historia destacada "${highlight.title}"?`)) return false;
 
-  const rect = area.getBoundingClientRect();
-  const tapX = endX - rect.left;
-  if (tapX < rect.width * 0.35) prevHighlightSlide();
-  else nextHighlightSlide();
- }, { passive: true });
+ // Primero las fotos (por si la base no las borra en cascada) y luego la destacada
+ await db.from('highlight_items').delete().eq('highlight_id', highlight.id).eq('user_id', currentUser.id);
+ const { error } = await db.from('highlights').delete().eq('id', highlight.id).eq('user_id', currentUser.id);
+ if (error) {
+  alert('No se pudo eliminar la destacada. Intentá de nuevo.');
+  return false;
+ }
+ refreshHighlightsAfterChange(currentUser.id);
+ return true;
+}
 
- area.addEventListener('click', e => {
-  if ('ontouchstart' in window) return;
-  const rect = area.getBoundingClientRect();
-  const clickX = e.clientX - rect.left;
-  if (clickX < rect.width * 0.35) prevHighlightSlide();
-  else nextHighlightSlide();
- });
-})();
+async function deleteCurrentHighlight() {
+ const hl = currentHighlightObj;
+ closeHighlightManageSheet();
+ if (!hl) return;
+ const ok = await deleteHighlightById(hl);
+ if (ok) closeHighlightViewer();
+}
 
-async function loadHighlights(userId, containerId) {
- const container = document.getElementById(containerId);
- if (!container || !userId) return;
+async function deleteCurrentHighlightPhoto() {
+ const hl = currentHighlightObj;
+ const idx = currentHighlightIndex;
+ const itemId = currentHighlightItemIds[idx];
+ closeHighlightManageSheet();
+ if (!hl || !currentUser || hl.user_id !== currentUser.id) return;
 
+ // Si es la única foto, se borra la destacada completa
+ if (!itemId || currentHighlightItemIds.length <= 1) {
+  const ok = await deleteHighlightById(hl);
+  if (ok) closeHighlightViewer();
+  return;
+ }
+ if (!confirm('¿Eliminar esta foto de la destacada?')) return;
+
+ const removedUrl = currentHighlightItems[idx];
+ const { error } = await db.from('highlight_items').delete().eq('id', itemId).eq('user_id', currentUser.id);
+ if (error) {
+  alert('No se pudo eliminar la foto. Intentá de nuevo.');
+  return;
+ }
+
+ currentHighlightItems.splice(idx, 1);
+ currentHighlightItemIds.splice(idx, 1);
+ if (hl.items) hl.items = currentHighlightItems.slice();
+ if (hl.itemIds) hl.itemIds = currentHighlightItemIds.slice();
+
+ // Si la foto borrada era la portada, la portada pasa a ser la primera que queda
+ if (hl.cover_url === removedUrl) {
+  hl.cover_url = currentHighlightItems[0];
+  await db.from('highlights').update({ cover_url: hl.cover_url }).eq('id', hl.id).eq('user_id', currentUser.id);
+ }
+
+ currentHighlightIndex = Math.min(idx, currentHighlightItems.length - 1);
+ refreshHighlightsAfterChange(currentUser.id);
+ renderCurrentHighlightItem();
+}
+
+function renderHighlightsListToDOM(highlights, userId, container) {
  const isOwner = currentUser && userId === currentUser.id;
- const highlights = await fetchUserHighlightsFromSupabase(userId);
  const profile = profilesCache[userId] || (isOwner ? myProfile : viewedProfile);
  const fragment = document.createDocumentFragment();
 
@@ -323,25 +394,38 @@ async function loadHighlights(userId, containerId) {
   const newDiv = document.createElement('div');
   newDiv.className = 'highlight-item';
   newDiv.onclick = () => createNewHighlightModal();
-  newDiv.innerHTML = `<div class="highlight-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="width:24px;height:24px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div><span class="highlight-title">Nuevo</span>`;
+  newDiv.innerHTML = `<div class="highlight-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div><span class="highlight-title">Nuevo</span>`;
   fragment.append(newDiv);
  }
 
- highlights.forEach(h => {
+ (highlights || []).forEach(h => {
   const item = document.createElement('div');
   item.className = 'highlight-item';
   item.onclick = () => openHighlightViewer(h, profile);
 
   if (isOwner) {
-   item.oncontextmenu = async e => {
+   // Mantener presionado (celular) o clic derecho (computadora) para eliminar
+   let pressTimer = null;
+   let longPressed = false;
+   const cancelPress = () => clearTimeout(pressTimer);
+   item.addEventListener('touchstart', () => {
+    longPressed = false;
+    pressTimer = setTimeout(() => {
+     longPressed = true;
+     if (navigator.vibrate) navigator.vibrate(15);
+     deleteHighlightById(h);
+    }, 600);
+   }, { passive: true });
+   item.addEventListener('touchmove', cancelPress, { passive: true });
+   item.addEventListener('touchend', cancelPress, { passive: true });
+   item.addEventListener('touchcancel', cancelPress, { passive: true });
+   item.onclick = () => {
+    if (longPressed) { longPressed = false; return; }
+    openHighlightViewer(h, profile);
+   };
+   item.oncontextmenu = e => {
     e.preventDefault();
-    if (confirm(`¿Eliminar historia destacada "${h.title}"?`)) {
-     const { error } = await db.from('highlights').delete().eq('id', h.id).eq('user_id', currentUser.id);
-     if (!error) {
-      delete highlightsCacheByUser[userId];
-      loadHighlights(userId, containerId);
-     }
-    }
+    deleteHighlightById(h);
    };
   }
 
@@ -352,6 +436,7 @@ async function loadHighlights(userId, containerId) {
    const img = document.createElement('img');
    img.src = coverSrc;
    img.loading = 'lazy';
+   img.decoding = 'async';
    circle.append(img);
   } else {
    circle.textContent = '⭐';
@@ -368,3 +453,14 @@ async function loadHighlights(userId, containerId) {
  container.replaceChildren(fragment);
 }
 
+async function loadHighlights(userId, containerId) {
+ const container = document.getElementById(containerId);
+ if (!container || !userId) return;
+
+ if (Array.isArray(highlightsCacheByUser[userId])) {
+  renderHighlightsListToDOM(highlightsCacheByUser[userId], userId, container);
+ }
+
+ const highlights = await fetchUserHighlightsFromSupabase(userId);
+ renderHighlightsListToDOM(highlights, userId, container);
+}

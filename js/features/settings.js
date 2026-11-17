@@ -1,7 +1,58 @@
 /* Depende de: config.js (db); state.js (currentUser); utils.js (status);
    core/realtime.js (setupPresenceChannel)
    Expone: MENU_PREFS_CONFIG, saveMenuPreferences, loadMenuPreferences,
-   submitHelpReport, populateAccountCenter, updateUserPassword */
+   submitHelpReport, populateAccountCenter, updateUserPassword,
+   THEME_COLORS, getSavedTheme, applyTheme, setTheme, initTheme */
+
+/* ---------- Temas (Automático · Blanco · Gris · Oscuro · Negro) ---------- */
+const THEME_STORAGE_KEY = 'og_theme';
+const THEME_COLORS = { light: '#fbf8fc', gray: '#e4e4e7', dark: '#121214', black: '#000000' };
+const THEME_OPTIONS = ['auto', 'light', 'gray', 'dark', 'black'];
+
+function getSavedTheme() {
+ try {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  return THEME_OPTIONS.includes(saved) ? saved : 'light';
+ } catch (e) {
+  return 'light';
+ }
+}
+
+function resolveTheme(pref) {
+ if (pref !== 'auto') return pref;
+ return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme(pref) {
+ const theme = resolveTheme(pref);
+ const root = document.documentElement;
+ root.classList.add('theme-switching');
+ root.setAttribute('data-theme', theme);
+ requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
+ document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme] || THEME_COLORS.light);
+ document.querySelectorAll('#themePicker .theme-option').forEach(btn => {
+  const selected = btn.dataset.themeOpt === pref;
+  btn.classList.toggle('active', selected);
+  btn.setAttribute('aria-checked', selected ? 'true' : 'false');
+ });
+}
+
+function setTheme(pref) {
+ if (!THEME_OPTIONS.includes(pref)) return;
+ try { localStorage.setItem(THEME_STORAGE_KEY, pref); } catch (e) {}
+ applyTheme(pref);
+}
+
+function initTheme() {
+ applyTheme(getSavedTheme());
+ // En modo Automático, seguir los cambios del sistema en vivo
+ if (window.matchMedia) {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const onChange = () => { if (getSavedTheme() === 'auto') applyTheme('auto'); };
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else if (mq.addListener) mq.addListener(onChange);
+ }
+}
 const MENU_PREFS_CONFIG = [
  { key: 'dataSaver', id: 'cfgDataSaverToggle', defaultVal: false },
  { key: 'autoplay', id: 'cfgAutoplayToggle', defaultVal: true },
@@ -47,8 +98,6 @@ function submitHelpReport() {
 
 function populateAccountCenter() {
  if (!currentUser) return;
- refreshGoogleIdentityUI();
- document.getElementById('googleLinkStatus').textContent = '';
  document.getElementById('passwordStatus').textContent = '';
  document.getElementById('newPasswordInput').value = '';
 }
@@ -66,39 +115,3 @@ async function updateUserPassword() {
  status('passwordStatus', '¡Contraseña actualizada correctamente!');
 }
 
-
-
-// Vincula Google a la sesión Ög actual. No busca ni fusiona cuentas por correo.
-function hasGoogleIdentity(user) {
- return !!user?.identities?.some(identity => identity.provider === 'google');
-}
-
-function refreshGoogleIdentityUI() {
- const statusEl = document.getElementById('googleIdentityStatus');
- const button = document.getElementById('googleLinkButton');
- if (!statusEl || !button) return;
- const linked = hasGoogleIdentity(currentUser);
- statusEl.textContent = linked ? 'Google ya está vinculado a esta cuenta de Ög.' : 'Todavía no vinculaste una cuenta de Google.';
- button.textContent = linked ? 'Cuenta de Google vinculada' : 'Vincular cuenta de Google';
- button.disabled = linked;
-}
-
-async function linkGoogleAccount() {
- const statusEl = document.getElementById('googleLinkStatus');
- if (!currentUser) {
-  if (statusEl) statusEl.textContent = 'Iniciá sesión en Ög antes de vincular Google.';
-  return;
- }
- if (hasGoogleIdentity(currentUser)) {
-  refreshGoogleIdentityUI();
-  if (statusEl) statusEl.textContent = 'Esta cuenta ya tiene Google vinculado.';
-  return;
- }
- if (statusEl) statusEl.textContent = 'Redirigiendo a Google para autorizar la vinculación...';
- const redirectTo = window.location.origin + window.location.pathname;
- const { error } = await db.auth.linkIdentity({
-  provider: 'google',
-  options: { redirectTo }
- });
- if (error && statusEl) statusEl.textContent = 'No se pudo vincular Google: ' + error.message;
-}

@@ -1,11 +1,19 @@
-/* Depende de: config.js (db); state.js (currentUser, profilesCache); utils.js (formatDate,
-   createAvatarNode)
+/* Depende de: config.js (db); state.js (currentUser, profilesCache, cachedActivityEvents);
+   utils.js (formatDate, createAvatarNode, ogCache, setCachedProfile, PROFILE_MINI_FIELDS)
    En tiempo de ejecución usa funciones de otros módulos: showAuthOverlay (auth.js),
    openPublicProfile (profile.js)
    Expone: loadActivity, renderActivityDOM, loadUserOwnActivity */
 async function loadActivity() {
  const container = document.getElementById('activitylist');
  if (!currentUser) { showAuthOverlay(); return; }
+
+ if (!cachedActivityEvents) {
+  const cached = ogCache.get('activity_events', 1000 * 60 * 60 * 6);
+  if (Array.isArray(cached)) cachedActivityEvents = cached;
+ }
+ if (Array.isArray(cachedActivityEvents)) {
+  renderActivityDOM(cachedActivityEvents, container);
+ }
 
  try {
   const { data: ownPosts } = await db.from('posts').select('id').eq('user_id', currentUser.id);
@@ -23,65 +31,67 @@ async function loadActivity() {
   (commentsResult.data || []).forEach(c => { if (c.user_id !== currentUser.id) events.push({ type: 'comment', user_id: c.user_id, content: c.content, created_at: c.created_at }); });
 
   events.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-  renderActivityDOM(events, container);
+  cachedActivityEvents = events;
+  ogCache.set('activity_events', events);
+  await renderActivityDOM(events, container);
  } catch (e) {
-  container.textContent = 'No se pudo cargar la actividad.';
+  if (!cachedActivityEvents) {
+   container.textContent = 'No se pudo cargar la actividad.';
+  }
  }
 }
 
-function renderActivityDOM(events, container) {
- if (!events.length) {
+async function renderActivityDOM(events, container) {
+ if (!events || !events.length) {
   container.innerHTML = '<div class="activity-empty">Todavía no tenés actividad reciente.</div>';
   return;
  }
 
- (async () => {
-  const missing = [...new Set(events.map(e => e.user_id).filter(Boolean))].filter(id => !profilesCache[id]);
-  if (missing.length > 0) {
-   const { data: newProfiles } = await db.from('profiles').select('id,username,display_name,avatar_url').in('id', missing);
-   (newProfiles || []).forEach(p => profilesCache[p.id] = p);
+ const missing = [...new Set(events.map(e => e.user_id).filter(Boolean))].filter(id => !profilesCache[id]);
+ if (missing.length > 0) {
+  const { data: newProfiles } = await db.from('og_profiles').select(PROFILE_MINI_FIELDS).in('id', missing);
+  (newProfiles || []).forEach(p => setCachedProfile(p, false));
+ }
+
+ const fragment = document.createDocumentFragment();
+ events.forEach(event => {
+  const profile = profilesCache[event.user_id];
+  if (!profile) return;
+
+  const item = document.createElement('div');
+  item.className = 'activity-item';
+  item.append(createAvatarNode(profile, false));
+
+  const info = document.createElement('div');
+  info.className = 'activity-info';
+  const message = document.createElement('div');
+  const name = document.createElement('strong');
+  name.textContent = profile.display_name || profile.username;
+  message.append(name);
+
+  if (event.type === 'follow') message.append(document.createTextNode(' comenzó a seguirte.'));
+  else if (event.type === 'like') message.append(document.createTextNode(' le dio Me gusta a tu publicación.'));
+  else if (event.type === 'comment') message.append(document.createTextNode(' comentó tu publicación.'));
+
+  info.append(message);
+  if (event.type === 'comment') {
+   const cText = document.createElement('div');
+   cText.style.color = 'var(--text-secondary)';
+   cText.style.marginTop = '3px';
+   cText.textContent = '“' + event.content + '”';
+   info.append(cText);
   }
 
-  const fragment = document.createDocumentFragment();
-  events.forEach(event => {
-   const profile = profilesCache[event.user_id];
-   if (!profile) return;
+  const date = document.createElement('div');
+  date.className = 'activity-date';
+  date.textContent = formatDate(event.created_at);
+  info.append(date);
 
-   const item = document.createElement('div');
-   item.className = 'activity-item';
-   item.append(createAvatarNode(profile, false));
-
-   const info = document.createElement('div');
-   info.className = 'activity-info';
-   const message = document.createElement('div');
-   const name = document.createElement('strong');
-   name.textContent = profile.display_name || profile.username;
-   message.append(name);
-
-   if (event.type === 'follow') message.append(document.createTextNode(' comenzó a seguirte.'));
-   else if (event.type === 'like') message.append(document.createTextNode(' le dio Me gusta a tu publicación.'));
-   else if (event.type === 'comment') message.append(document.createTextNode(' comentó tu publicación.'));
-
-   info.append(message);
-   if (event.type === 'comment') {
-    const cText = document.createElement('div');
-    cText.style.color = '#666666';
-    cText.style.marginTop = '3px';
-    cText.textContent = '“' + event.content + '”';
-    info.append(cText);
-   }
-
-   const date = document.createElement('div');
-   date.className = 'activity-date';
-   date.textContent = formatDate(event.created_at);
-   info.append(date);
-
-   item.append(info);
-   item.onclick = () => openPublicProfile(profile.id);
-   fragment.append(item);
-  });
-  container.replaceChildren(fragment);
- })();
+  item.append(info);
+  item.onclick = () => openPublicProfile(profile.id);
+  fragment.append(item);
+ });
+ container.replaceChildren(fragment);
 }
 
 async function loadUserOwnActivity() {
@@ -110,8 +120,8 @@ async function loadUserOwnActivity() {
 
   const missingUserIds = [...new Set(events.map(e => e.user_id).filter(Boolean))].filter(id => !profilesCache[id]);
   if (missingUserIds.length > 0) {
-   const { data: profs } = await db.from('profiles').select('id, username, display_name, avatar_url').in('id', missingUserIds);
-   (profs || []).forEach(p => profilesCache[p.id] = p);
+   const { data: profs } = await db.from('og_profiles').select(PROFILE_MINI_FIELDS).in('id', missingUserIds);
+   (profs || []).forEach(p => setCachedProfile(p, false));
   }
 
   const fragment = document.createDocumentFragment();
@@ -130,7 +140,11 @@ async function loadUserOwnActivity() {
    if (ev.type === 'liked_post') {
     text.innerHTML = '❤ Le diste <strong>Me gusta</strong> a una publicación.';
    } else if (ev.type === 'commented_post') {
-    text.innerHTML = `💬 Comentaste: <span style="color:#666666">“${ev.content}”</span>`;
+    const span = document.createElement('span');
+    span.style.color = 'var(--text-secondary)';
+    span.textContent = `“${ev.content}”`;
+    text.textContent = '💬 Comentaste: ';
+    text.append(span);
    } else if (ev.type === 'followed_user') {
     const p = profilesCache[ev.user_id];
     text.innerHTML = `👤 Empezaste a seguir a <strong>@${p?.username || 'usuario'}</strong>.`;
@@ -146,4 +160,3 @@ async function loadUserOwnActivity() {
   container.innerHTML = '<div class="activity-empty">No se pudo cargar el historial.</div>';
  }
 }
-

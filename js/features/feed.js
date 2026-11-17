@@ -1,10 +1,11 @@
-
 /* Depende de: config.js (db); state.js (currentUser, myProfile, profilesCache, feedPage,
-   FEED_PAGE_SIZE, feedLoading, feedHasMore, loadedPostIds, cachedFeedPosts, isPublishing,
-   postImageBlob, visitorId); utils.js (status, formatDate, setPreviewBlobUrl,
-   createAvatarNode, renderPostsGrid); core/navigation.js (showTab)
+   FEED_PAGE_SIZE, feedLoading, feedHasMore, loadedPostIds, cachedFeedPosts, cachedFollowingIds,
+   cachedActivityEvents, isPublishing, postImageBlob, visitorId); utils.js (status, formatDate,
+   setPreviewBlobUrl, revokePreviewBlobUrl, compressImageBlob, createAvatarNode, renderPostsGrid,
+   ogCache, setCachedProfile, prefetchUserProfile, bindSmartPrefetch, POST_SELECT_FIELDS,
+   PROFILE_MINI_FIELDS); core/navigation.js (showTab)
    En tiempo de ejecución usa funciones de otros módulos: showAuthOverlay (auth.js),
-   openPublicProfile (profile.js), loadExploreGrid (explore.js)
+   openPublicProfile (profile.js)
    Expone: loadInitialPosts, loadMorePosts, fetchAndAppendPosts, renderPostsToDOM,
    prependSinglePostToFeed, buildPostDOMElement, toggleLike, loadPostLikes,
    loadPostComments, quickComment, handlePostImageSelect, removePostImage, publish,
@@ -14,12 +15,12 @@
 async function loadInitialPosts() {
  feedPage = 0;
  feedHasMore = true;
- loadedPostIds.clear();
  const container = document.getElementById('posts');
 
  if (cachedFeedPosts && cachedFeedPosts.length > 0) {
   renderPostsToDOM(cachedFeedPosts, container, true);
  } else {
+  loadedPostIds.clear();
   container.innerHTML = '<div class="activity-empty">Cargando publicaciones...</div>';
  }
  await fetchAndAppendPosts(true);
@@ -31,27 +32,38 @@ async function loadMorePosts() {
  await fetchAndAppendPosts(false);
 }
 
+async function getAllowedFeedUserIds() {
+ if (!currentUser) return [];
+ if (Array.isArray(cachedFollowingIds)) {
+  return [...new Set([...cachedFollowingIds, currentUser.id])];
+ }
+ const { data: followingRes } = await db.from('follows')
+  .select('following_id')
+  .eq('follower_id', currentUser.id);
+ cachedFollowingIds = (followingRes || []).map(f => f.following_id);
+ ogCache.set('following_ids', cachedFollowingIds);
+ return [...new Set([...cachedFollowingIds, currentUser.id])];
+}
+
 async function fetchAndAppendPosts(isInitial) {
  if (feedLoading || !feedHasMore || !currentUser) return;
  feedLoading = true;
  const loader = document.getElementById('feedLoader');
- loader.style.display = 'block';
+ if (loader) loader.style.display = 'block';
 
  try {
-  const { data: followingRes } = await db.from('follows').select('following_id').eq('follower_id', currentUser.id);
-  const followingIds = (followingRes || []).map(f => f.following_id);
-  const allowedUserIds = [...followingIds, currentUser.id];
+  const allowedUserIds = await getAllowedFeedUserIds();
 
   const from = feedPage * FEED_PAGE_SIZE;
   const to = from + FEED_PAGE_SIZE - 1;
 
   const { data: posts, error } = await db.from('posts')
-   .select('*')
+   .select(POST_SELECT_FIELDS)
    .in('user_id', allowedUserIds)
    .order('created_at', { ascending: false })
    .range(from, to);
 
-  loader.style.display = 'none';
+  if (loader) loader.style.display = 'none';
   feedLoading = false;
   if (error) return;
 
@@ -59,40 +71,80 @@ async function fetchAndAppendPosts(isInitial) {
 
   if (!posts || !posts.length) {
    if (isInitial) {
+    cachedFeedPosts = [];
+    ogCache.set('feed_posts', []);
     document.getElementById('posts').innerHTML = '<div class="activity-empty">Aún no sigues a nadie o no hay publicaciones en tu feed. ¡Explora perfiles para ver contenido!</div>';
    }
    return;
   }
 
-  const uniqueNewPosts = posts.filter(p => !loadedPostIds.has(p.id));
-  if (!uniqueNewPosts.length && isInitial) return;
+  const targetPosts = isInitial ? posts : posts.filter(p => !loadedPostIds.has(p.id));
+  if (!targetPosts.length && !isInitial) return;
 
-  const missingUserIds = [...new Set(uniqueNewPosts.map(p => p.user_id))].filter(id => !profilesCache[id]);
+  const postIds = targetPosts.map(p => p.id);
+
+  // Eliminar consultas N+1: cargar likes y comentarios de toda la página en 2 consultas batch
+  const [likesRes, commentsRes] = await Promise.all([
+   db.from('likes').select('post_id, user_id').in('post_id', postIds),
+   db.from('comments').select('id, post_id, user_id, content, created_at').in('post_id', postIds).order('created_at', { ascending: true })
+  ]);
+
+  const likesByPost = {};
+  (likesRes.data || []).forEach(like => {
+   if (!likesByPost[like.post_id]) likesByPost[like.post_id] = [];
+   likesByPost[like.post_id].push(like);
+  });
+
+  const commentsByPost = {};
+  (commentsRes.data || []).forEach(comment => {
+   if (!commentsByPost[comment.post_id]) commentsByPost[comment.post_id] = [];
+   commentsByPost[comment.post_id].push(comment);
+  });
+
+  const neededUserIds = new Set();
+  targetPosts.forEach(p => { if (p.user_id) neededUserIds.add(p.user_id); });
+  (commentsRes.data || []).forEach(c => { if (c.user_id) neededUserIds.add(c.user_id); });
+
+  const missingUserIds = [...neededUserIds].filter(id => !profilesCache[id]);
   if (missingUserIds.length > 0) {
-   const { data: newProfiles } = await db.from('og_profiles').select('id, username, display_name, avatar_url').in('id', missingUserIds);
-   (newProfiles || []).forEach(p => profilesCache[p.id] = p);
+   const { data: newProfiles } = await db.from('og_profiles')
+    .select(PROFILE_MINI_FIELDS)
+    .in('id', missingUserIds);
+   (newProfiles || []).forEach(p => setCachedProfile(p, false));
+   ogCache.set('profiles_map', profilesCache);
   }
+
+  const metaByPost = {};
+  targetPosts.forEach(p => {
+   metaByPost[p.id] = {
+    likes: likesByPost[p.id] || [],
+    comments: commentsByPost[p.id] || []
+   };
+  });
 
   if (isInitial) {
    cachedFeedPosts = posts;
-   renderPostsToDOM(posts, document.getElementById('posts'), true);
+   ogCache.set('feed_posts', posts.slice(0, 30));
+   renderPostsToDOM(posts, document.getElementById('posts'), true, metaByPost);
   } else {
-   cachedFeedPosts = (cachedFeedPosts || []).concat(uniqueNewPosts);
+   cachedFeedPosts = (cachedFeedPosts || []).concat(targetPosts);
+   ogCache.set('feed_posts', cachedFeedPosts.slice(0, 30));
    const container = document.getElementById('posts');
    const fragment = document.createDocumentFragment();
-   uniqueNewPosts.forEach(post => {
+   targetPosts.forEach(post => {
     loadedPostIds.add(post.id);
-    fragment.append(buildPostDOMElement(post));
+    fragment.append(buildPostDOMElement(post, metaByPost[post.id]));
    });
    container.append(fragment);
   }
  } catch (e) {
-  loader.style.display = 'none';
+  if (loader) loader.style.display = 'none';
   feedLoading = false;
  }
 }
 
-function renderPostsToDOM(posts, container, reset = false) {
+function renderPostsToDOM(posts, container, reset = false, metaByPost = null) {
+ if (!container) return;
  if (reset) {
   loadedPostIds.clear();
   container.replaceChildren();
@@ -103,7 +155,7 @@ function renderPostsToDOM(posts, container, reset = false) {
  posts.forEach(post => {
   if (loadedPostIds.has(post.id)) return;
   loadedPostIds.add(post.id);
-  fragment.append(buildPostDOMElement(post));
+  fragment.append(buildPostDOMElement(post, metaByPost ? metaByPost[post.id] : null));
  });
 
  if (reset) container.replaceChildren(fragment);
@@ -111,13 +163,38 @@ function renderPostsToDOM(posts, container, reset = false) {
 }
 
 function prependSinglePostToFeed(post) {
- if (loadedPostIds.has(post.id)) return;
+ if (!post || loadedPostIds.has(post.id)) return;
  loadedPostIds.add(post.id);
  const container = document.getElementById('posts');
+ if (!container) return;
+ const emptyPlaceholder = container.querySelector('.activity-empty');
+ if (emptyPlaceholder) emptyPlaceholder.remove();
  container.insertBefore(buildPostDOMElement(post), container.firstChild);
 }
 
-function buildPostDOMElement(post) {
+function renderCommentsListToContainer(comments, container) {
+ if (!comments || !comments.length) {
+  container.replaceChildren();
+  return;
+ }
+ const fragment = document.createDocumentFragment();
+ comments.slice(0, 3).forEach(c => {
+  const profile = profilesCache[c.user_id] || { username: 'usuario' };
+  const div = document.createElement('div');
+  div.className = 'comment-item';
+  const userSpan = document.createElement('span');
+  userSpan.className = 'comment-user';
+  userSpan.textContent = profile.display_name || profile.username;
+  const textSpan = document.createElement('span');
+  textSpan.className = 'comment-text';
+  textSpan.textContent = c.content;
+  div.append(userSpan, textSpan);
+  fragment.append(div);
+ });
+ container.replaceChildren(fragment);
+}
+
+function buildPostDOMElement(post, preloadedMeta = null) {
  const profile = profilesCache[post.user_id] || { username: 'usuario' };
 
  const article = document.createElement('article');
@@ -126,13 +203,18 @@ function buildPostDOMElement(post) {
  const head = document.createElement('div');
  head.className = 'posthead';
 
+ const goProfile = () => openPublicProfile(post.user_id);
+ const prefetchAuthor = () => prefetchUserProfile(post.user_id);
+
  const av = createAvatarNode(profile, false);
  av.style.cursor = 'pointer';
- av.onclick = () => openPublicProfile(post.user_id);
+ av.onclick = goProfile;
+ bindSmartPrefetch(av, prefetchAuthor);
 
  const info = document.createElement('div');
  info.style.cursor = 'pointer';
- info.onclick = () => openPublicProfile(post.user_id);
+ info.onclick = goProfile;
+ bindSmartPrefetch(info, prefetchAuthor);
 
  const name = document.createElement('div');
  name.className = 'username';
@@ -152,6 +234,7 @@ function buildPostDOMElement(post) {
   img.src = post.image_url;
   img.alt = 'Imagen';
   img.loading = 'lazy';
+  img.decoding = 'async';
   article.append(img);
  }
 
@@ -217,8 +300,17 @@ function buildPostDOMElement(post) {
  likesCountDiv.textContent = '0 Me gusta';
  article.append(likesCountDiv);
 
- loadPostLikes(post.id, likeBtn, likesCountDiv);
- loadPostComments(post.id, commentsSec);
+ if (preloadedMeta) {
+  const likes = preloadedMeta.likes || [];
+  likesCountDiv.textContent = `${likes.length} Me gusta`;
+  if (currentUser && likes.some(l => l.user_id === currentUser.id)) {
+   likeBtn.classList.add('liked');
+  }
+  renderCommentsListToContainer(preloadedMeta.comments || [], commentsSec);
+ } else {
+  loadPostLikes(post.id, likeBtn, likesCountDiv);
+  loadPostComments(post.id, commentsSec);
+ }
 
  return article;
 }
@@ -242,24 +334,19 @@ async function loadPostLikes(postId, btn, countDiv) {
 }
 
 async function loadPostComments(postId, container) {
- const { data: comments } = await db.from('comments').select('*').eq('post_id', postId).order('created_at', { ascending: true });
+ const { data: comments } = await db.from('comments')
+  .select('id, post_id, user_id, content, created_at')
+  .eq('post_id', postId)
+  .order('created_at', { ascending: true });
  if (!comments || !comments.length) { container.replaceChildren(); return; }
 
  const missing = [...new Set(comments.map(c => c.user_id))].filter(id => !profilesCache[id]);
  if (missing.length > 0) {
-  const { data: profs } = await db.from('og_profiles').select('id, username, display_name, avatar_url').in('id', missing);
-  (profs || []).forEach(p => profilesCache[p.id] = p);
+  const { data: profs } = await db.from('og_profiles').select(PROFILE_MINI_FIELDS).in('id', missing);
+  (profs || []).forEach(p => setCachedProfile(p, false));
  }
 
- const fragment = document.createDocumentFragment();
- comments.slice(0, 3).forEach(c => {
-  const profile = profilesCache[c.user_id] || { username: 'usuario' };
-  const div = document.createElement('div');
-  div.className = 'comment-item';
-  div.innerHTML = `<span class="comment-user">${profile.display_name || profile.username}</span><span class="comment-text">${c.content}</span>`;
-  fragment.append(div);
- });
- container.replaceChildren(fragment);
+ renderCommentsListToContainer(comments, container);
 }
 
 async function quickComment(postId, input) {
@@ -269,22 +356,25 @@ async function quickComment(postId, input) {
  input.value = '';
  await db.from('comments').insert({ post_id: postId, user_id: currentUser.id, content: text });
  cachedActivityEvents = null;
+ ogCache.remove('activity_events');
  const sec = document.getElementById(`comments-${postId}`);
  if (sec) loadPostComments(postId, sec);
 }
 
-function handlePostImageSelect(input) {
+async function handlePostImageSelect(input) {
  const file = input.files?.[0];
  if (!file) return;
- postImageBlob = file;
- setPreviewBlobUrl(document.getElementById('postImagePreviewImg'), file);
+ input.value = '';
+ const compressed = await compressImageBlob(file, 1080, 0.82);
+ postImageBlob = compressed;
+ setPreviewBlobUrl(document.getElementById('postImagePreviewImg'), compressed);
  document.getElementById('postImagePreviewContainer').style.display = 'block';
  document.getElementById('dropzoneBox').style.display = 'none';
- input.value = '';
 }
 
 function removePostImage() {
  postImageBlob = null;
+ revokePreviewBlobUrl(document.getElementById('postImagePreviewImg'));
  document.getElementById('postImagePreviewContainer').style.display = 'none';
  document.getElementById('dropzoneBox').style.display = 'flex';
 }
@@ -316,13 +406,13 @@ async function publish() {
  status('publishStatus', '¡Publicado con éxito!');
  setTimeout(() => status('publishStatus', ''), 2000);
  cachedFeedPosts = null;
+ ogCache.remove('feed_posts');
  showTab('feed');
  await loadInitialPosts();
 }
 
 async function openPostDetail(post) {
  if (!currentUser) { showAuthOverlay(); return; }
- await db.rpc('register_post_view', { p_post_id: post.id, p_visitor_id: visitorId });
  const modal = document.getElementById('postDetailModal');
  const container = document.getElementById('modalPostContainer');
  container.replaceChildren();
@@ -344,6 +434,7 @@ async function openPostDetail(post) {
   const img = document.createElement('img');
   img.className = 'postimage';
   img.src = post.image_url;
+  img.decoding = 'async';
   article.append(img);
  }
  if (post.content) {
@@ -376,11 +467,18 @@ async function openPostDetail(post) {
  container.append(article);
  modal.classList.add('active');
  loadPostComments(post.id, commentsSec);
+
+ db.rpc('register_post_view', { p_post_id: post.id, p_visitor_id: visitorId }).then(() => {
+  const nextViews = (post.views || 0) + 1;
+  post.views = nextViews;
+  document.querySelectorAll(`[data-post-views="${post.id}"]`).forEach(el => {
+   el.textContent = nextViews;
+  });
+ }).catch(() => {});
 }
 
 function closePostDetailModal() {
  document.getElementById('postDetailModal').classList.remove('active');
- loadExploreGrid();
 }
 
 function getSavedPostIds() {
@@ -411,7 +509,7 @@ async function fetchAndRenderSavedGrid(gridId, emptyText) {
   renderPostsGrid([], grid, emptyText);
   return;
  }
- const { data: posts } = await db.from('posts').select('*').in('id', savedIds);
+ const { data: posts } = await db.from('posts').select(POST_SELECT_FIELDS).in('id', savedIds);
  renderPostsGrid(posts, grid, 'No se encontraron publicaciones guardadas.');
 }
 

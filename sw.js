@@ -1,6 +1,6 @@
 /* ÖG — Service Worker (og-mobile-dev) */
 
-const VERSION = '1.0.0';
+const VERSION = '1.2.1';
 const CACHE_PREFIX = 'og-mobile-dev-';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 
@@ -14,6 +14,20 @@ const APP_SHELL = [
   './',
   'index.html',
   'manifest.json',
+  'css/variables.css',
+  'css/components.css',
+  'css/auth.css',
+  'css/header.css',
+  'css/layout.css',
+  'css/navigation.css',
+  'css/stories.css',
+  'css/camera.css',
+  'css/story-viewer.css',
+  'css/feed.css',
+  'css/explore.css',
+  'css/chat.css',
+  'css/profile.css',
+  'css/settings.css',
   'css/style.css',
   'js/config.js',
   'js/state.js',
@@ -63,6 +77,7 @@ self.addEventListener('activate', (event) => {
         .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
         .map((k) => caches.delete(k))
     );
+    await self.clients.claim();
   })());
 });
 
@@ -86,7 +101,7 @@ self.addEventListener('fetch', (event) => {
     if (req.mode === 'navigate') {
       event.respondWith(handleNavigation(req, url));
     } else {
-      event.respondWith(networkFirst(req));
+      event.respondWith(staleWhileRevalidate(event, req));
     }
     return;
   }
@@ -115,23 +130,10 @@ async function handleNavigation(req, url) {
   }
 }
 
-/* JS, CSS, íconos: red primero (evita versiones viejas), caché como respaldo */
-async function networkFirst(req) {
-  const cache = await caches.open(CACHE_NAME);
-  try {
-    const res = await fetch(req, { cache: 'no-cache' });
-    if (res.ok) cache.put(req, res.clone());
-    return res;
-  } catch (e) {
-    const cached = (await cache.match(req)) || (await cache.match(req, { ignoreSearch: true }));
-    return cached || new Response('', { status: 503, statusText: 'Sin conexión' });
-  }
-}
-
-/* CDN: usa lo guardado y lo actualiza en segundo plano */
+/* Assets estáticos (JS, CSS, íconos, CDN): respuesta instantánea desde caché y actualización en segundo plano */
 async function staleWhileRevalidate(event, req) {
   const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(req);
+  const cached = await cache.match(req) || await cache.match(req, { ignoreSearch: true });
 
   const network = fetch(req)
     .then((res) => {

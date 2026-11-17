@@ -134,6 +134,11 @@ async function loadLoorsFeed(targetLoorId) {
     container.innerHTML = '';
     await renderLoorsBatch(firstBatch, container);
     attachLoorsSentinel(container);
+  } catch (err) {
+    console.error('Loors: error al mostrar videos', err);
+    if (token === loorsFeedToken && !container.querySelector('.loor-item')) {
+      container.innerHTML = `<div style="color:#fff;text-align:center;margin-top:42vh;padding:0 24px;"><p style="margin-bottom:14px;">No se pudieron cargar los videos.</p><button class="loor-submit-btn" style="background:#fff;color:#000;" onclick="loadLoorsFeed()">Reintentar</button></div>`;
+    }
   } finally {
     loorsLoading = false;
   }
@@ -239,7 +244,7 @@ async function renderLoorsBatch(loors, container) {
     card.dataset.loorId = loor.id;
 
     card.innerHTML = `
-      <video class="loor-video" src="${loor.video_url}" ${loor.thumbnail_url ? `poster="${escapeLoorHtml(loor.thumbnail_url)}"` : ''} playsinline loop preload="${loor.thumbnail_url && loorIndex > 0 ? 'none' : 'metadata'}" ${loor.audio_url ? 'muted' : ''}></video>
+      <video class="loor-video" src="${loor.video_url}" ${loor.thumbnail_url ? `poster="${escapeLoorHtml(loor.thumbnail_url)}"` : ''} playsinline loop preload="metadata" ${loor.audio_url ? 'muted' : ''}></video>
       ${loor.audio_url ? `<audio class="loor-audio" src="${escapeLoorHtml(loor.audio_url)}" loop preload="none"></audio>` : ''}
       <div class="loor-pause-indicator">❚❚</div>
 
@@ -311,6 +316,12 @@ async function renderLoorsBatch(loors, container) {
 
     // Pausar / reanudar tocando el video
     const videoEl = card.querySelector('.loor-video');
+    // Si el video falla al cargar, se reintenta una vez
+    videoEl.addEventListener('error', () => {
+      if (videoEl.dataset.retried) return;
+      videoEl.dataset.retried = '1';
+      setTimeout(() => { videoEl.load(); }, 1200);
+    });
     const audioEl = card.querySelector('.loor-audio');
     videoEl.addEventListener('click', () => {
       // Si el video corre pero el audio quedó bloqueado por el iPhone, el primer toque lo activa
@@ -362,6 +373,8 @@ function setupLoorAutoplayObserver(newCards) {
 
       if (entry.isIntersecting) {
         playLoorCard(card);
+        const nextVideo = card.nextElementSibling && card.nextElementSibling.querySelector && card.nextElementSibling.querySelector('.loor-video');
+        if (nextVideo) nextVideo.preload = 'auto';
 
         if (!viewedLoorsSession.has(loorId)) {
           viewedLoorsSession.add(loorId);

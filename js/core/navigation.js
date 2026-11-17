@@ -118,6 +118,14 @@ mainContainerElement.addEventListener('touchend', e => {
  touchStartX = 0;
 }, { passive: true });
 
+const tabLastRefresh = {};
+function tabNeedsRefresh(key, ms) {
+ const now = Date.now();
+ if (tabLastRefresh[key] && (now - tabLastRefresh[key]) < ms) return false;
+ tabLastRefresh[key] = now;
+ return true;
+}
+
 function showTab(id, btn) {
  if (!currentUser && id !== 'profile') {
   showAuthOverlay();
@@ -172,17 +180,26 @@ function showTab(id, btn) {
 
  updatePwaInstallButtonsVisibility();
 
- if (id === 'notifications') loadActivity();
- if (id === 'explore') {
-  loadExploreGrid();
-  if (!document.getElementById('search').value) resetExploreSearch();
- }
- if (id === 'messagesPage') loadConversations();
- if (id === 'profile' && currentUser) {
-  loadMyPostsGrid();
-  loadSavedPostsProfileGrid();
-  loadHighlights(currentUser.id, 'highlightsScrollContainer');
- }
+ // Videos de Explorar: se frenan al salir y se reanudan al volver (sin reconstruir nada)
+ if (id === 'explore') resumeExploreVideos();
+ else pauseExploreVideos();
+
+ // La pestaña se pinta primero; las cargas pesadas van después para que el cambio sea fluido
+ const runLoads = () => {
+  if (id === 'notifications') loadActivity();
+  if (id === 'explore') {
+   loadExploreGrid();
+   const resultsView = document.getElementById('exploreSearchResultsView');
+   if (!document.getElementById('search').value && resultsView?.classList.contains('active')) resetExploreSearch();
+  }
+  if (id === 'messagesPage') loadConversations();
+  if (id === 'profile' && currentUser) {
+   if (tabNeedsRefresh('profile_posts', 30000)) loadMyPostsGrid();
+   if (tabNeedsRefresh('profile_saved', 30000)) loadSavedPostsProfileGrid();
+   if (tabNeedsRefresh('profile_highlights', 30000)) loadHighlights(currentUser.id, 'highlightsScrollContainer');
+  }
+ };
+ requestAnimationFrame(() => setTimeout(runLoads, 0));
 
  if (id === 'feed') {
   if (wasFeedActive && btn) {

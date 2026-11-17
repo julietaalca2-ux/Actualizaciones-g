@@ -10,20 +10,81 @@ const LOOR_DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent(
 
 let activeLoorIdForComments = null;
 const viewedLoorsSession = new Set();
-let loorVideoObserver = null;
 let loorsInitialized = false;
+let loorsLoadedAt = 0;                 // cuándo se cargó el listado (para reabrir sin volver a pedirlo)
+const LOORS_FEED_TTL_MS = 120000;
 
 function initLoors() {
   if (loorsInitialized) return;
   loorsInitialized = true;
+  // El motor (loors-engine.js) decide cuándo reproducir/pausar; aquí solo se le dice CÓMO hacerlo
+  LoorsEngine.configure({
+    play: playLoorCard,
+    pause: pauseLoorCard,
+    onActivate: (card) => {
+      const loorId = card.dataset.loorId;
+      if (!viewedLoorsSession.has(loorId)) {
+        viewedLoorsSession.add(loorId);
+        incrementLoorViews(loorId, card);
+      }
+    }
+  });
   bindLoorsUIEvents();
+  initLoorsSoundUI();
 }
+
+// Botón de sonido (preferencia por sesión) y aviso cuando el navegador exige un toque para activar el audio
+function initLoorsSoundUI() {
+  const section = document.getElementById('loors-section');
+  if (!section || document.getElementById('loors-sound-btn')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'loors-sound-btn';
+  btn.className = 'loors-sound-btn';
+  btn.innerHTML =
+    '<svg class="ico-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>' +
+    '<svg class="ico-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+  const hint = document.createElement('div');
+  hint.id = 'loors-sound-hint';
+  hint.className = 'loors-sound-hint';
+  hint.textContent = 'Toca para activar el sonido';
+  section.appendChild(btn);
+  section.appendChild(hint);
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const snd = LoorsEngine.sound;
+    if (snd.needsTap()) snd.unlock();   // bloqueado por el navegador: este toque lo activa
+    else snd.toggle();                  // activar / silenciar (se recuerda en la sesión)
+  });
+  hint.addEventListener('click', () => LoorsEngine.sound.unlock());
+  LoorsEngine.sound.onChange((st) => {
+    btn.classList.toggle('is-off', !st.on);
+    btn.classList.toggle('needs-tap', !!st.needTap);
+    hint.classList.toggle('show', !!st.needTap);
+    btn.setAttribute('aria-label', st.on ? 'Silenciar' : 'Activar sonido');
+  });
+  // Cualquier toque real en Loors desbloquea el audio de Safari para los siguientes videos
+  section.addEventListener('touchend', () => LoorsEngine.sound.prime(), { passive: true });
+  section.addEventListener('click', () => LoorsEngine.sound.prime(), true);
+}
+
+// Diagnóstico desde la consola: loorsDiagnose() -> estado de video/música + revisión del archivo (audio, códec, faststart, HTTP Range)
+window.loorsDiagnose = function () {
+  return LoorsEngine.diagnose().then((r) => { console.log(JSON.stringify(r, null, 2)); return r; });
+};
 
 async function openLoorsSection(targetLoorId) {
   initLoors();
   const section = document.getElementById('loors-section');
   if (!section) return;
   section.classList.add('active');
+  // Reabrir poco después de cerrar: se reutiliza el listado (arranca al instante, sin volver a pedir todo)
+  const feed = document.getElementById('loors-feed-container');
+  if (!targetLoorId && feed && feed.querySelector('.loor-item') && Date.now() - loorsLoadedAt < LOORS_FEED_TTL_MS) {
+    LoorsEngine.resumeActive();
+    return;
+  }
   await loadLoorsFeed(targetLoorId);
 }
 
@@ -32,29 +93,16 @@ function closeLoorsSection() {
   if (!section) return;
   section.classList.remove('active');
   document.querySelectorAll('.loor-video, .loor-audio').forEach(media => media.pause());
+  LoorsEngine.suspend();   // libera los videos vecinos y deja todo en pausa
 }
 
-// Reproduce el video de una tarjeta y, si tiene música elegida, también su audio
+// El motor decide cómo suena cada Loor (audio propio del video o música elegida) y los mantiene sincronizados
 function playLoorCard(card) {
-  const video = card.querySelector('.loor-video');
-  const audio = card.querySelector('.loor-audio');
-
-  video.play().then(() => {
-    card.classList.remove('paused');
-  }).catch(() => {
-    video.muted = true;
-    video.play().catch(() => {});
-  });
-
-  // En iPhone el audio puede quedar bloqueado hasta que la persona toque la pantalla
-  if (audio) audio.play().catch(() => {});
+  LoorsEngine.playCard(card, () => card.classList.remove('paused'));
 }
 
 function pauseLoorCard(card) {
-  const video = card.querySelector('.loor-video');
-  const audio = card.querySelector('.loor-audio');
-  video.pause();
-  if (audio) audio.pause();
+  LoorsEngine.pauseCard(card);
 }
 
 /* Paginación: se cargan LOORS_PAGE_SIZE videos por vez; al llegar al final se piden los siguientes */
@@ -90,6 +138,7 @@ async function loadLoorsFeed(targetLoorId) {
   // Detener cualquier video o audio anterior antes de recargar la lista
   document.querySelectorAll('.loor-video, .loor-audio').forEach(media => media.pause());
   if (loorsSentinelObserver) { loorsSentinelObserver.disconnect(); loorsSentinelObserver = null; }
+  LoorsEngine.reset();   // suelta los videos del listado anterior (corta descargas y libera memoria)
   loorsPage = 0;
   loorsHasMore = true;
 
@@ -132,8 +181,11 @@ async function loadLoorsFeed(targetLoorId) {
     }
 
     container.innerHTML = '';
+    // El primer video empieza a bajar ya, mientras se consultan perfiles, likes y comentarios
+    LoorsEngine.warmFirst(firstBatch[0]);
     await renderLoorsBatch(firstBatch, container);
     attachLoorsSentinel(container);
+    loorsLoadedAt = Date.now();
   } catch (err) {
     console.error('Loors: error al mostrar videos', err);
     if (token === loorsFeedToken && !container.querySelector('.loor-item')) {
@@ -242,10 +294,10 @@ async function renderLoorsBatch(loors, container) {
     const card = document.createElement('article');
     card.className = 'loor-item';
     card.dataset.loorId = loor.id;
+    if (loor.audio_url) card.dataset.audio = loor.audio_url;   // música elegida: la reproduce el motor (un solo <audio> global)
 
     card.innerHTML = `
-      <video class="loor-video" src="${loor.video_url}" ${loor.thumbnail_url ? `poster="${escapeLoorHtml(loor.thumbnail_url)}"` : ''} playsinline loop preload="metadata" ${loor.audio_url ? 'muted' : ''}></video>
-      ${loor.audio_url ? `<audio class="loor-audio" src="${escapeLoorHtml(loor.audio_url)}" loop preload="none"></audio>` : ''}
+      <video class="loor-video" data-src="${escapeLoorHtml(loor.video_url)}" ${loor.thumbnail_url ? `data-poster="${escapeLoorHtml(loor.thumbnail_url)}"` : ''} playsinline webkit-playsinline loop preload="none" disablepictureinpicture disableremoteplayback ${loor.audio_url ? 'muted' : ''}></video>
       <div class="loor-pause-indicator">❚❚</div>
 
       <div class="loor-overlay-wrapper">
@@ -314,24 +366,28 @@ async function renderLoorsBatch(loors, container) {
       </div>
     `;
 
+    // Si el primer video ya venía descargándose (warmFirst), la tarjeta lo adopta
+    LoorsEngine.adopt(card, loor.id);
+
     // Pausar / reanudar tocando el video
     const videoEl = card.querySelector('.loor-video');
-    // Si el video falla al cargar, se reintenta una vez
+    // Si el video falla al cargar, se reintenta una vez (no aplica si el motor lo liberó a propósito)
     videoEl.addEventListener('error', () => {
-      if (videoEl.dataset.retried) return;
+      if (!videoEl.getAttribute('src') || videoEl.dataset.retried) return;
       videoEl.dataset.retried = '1';
       setTimeout(() => { videoEl.load(); }, 1200);
     });
-    const audioEl = card.querySelector('.loor-audio');
     videoEl.addEventListener('click', () => {
-      // Si el video corre pero el audio quedó bloqueado por el iPhone, el primer toque lo activa
-      if (audioEl && !videoEl.paused && audioEl.paused) {
-        audioEl.play().catch(() => {});
+      // El navegador había bloqueado el sonido: este toque (real) lo activa, sin pausar el video
+      if (LoorsEngine.sound.needsTap()) {
+        LoorsEngine.sound.unlock();
         return;
       }
       if (videoEl.paused) {
+        LoorsEngine.setManualPause(card, false);
         playLoorCard(card);
       } else {
+        LoorsEngine.setManualPause(card, true);   // pausa manual: se respeta al volver a la app
         pauseLoorCard(card);
         card.classList.add('paused');
       }
@@ -356,46 +412,9 @@ async function renderLoorsBatch(loors, container) {
   setupLoorAutoplayObserver(newCards);
 }
 
-/* Si ya existe el observador solo se agregan los videos nuevos (al cargar más páginas) */
+/* El motor observa cada tarjeta (un solo IntersectionObserver): reproduce solo la visible y gestiona la precarga */
 function setupLoorAutoplayObserver(newCards) {
-  const container = document.getElementById('loors-feed-container');
-  if (loorVideoObserver && newCards && loorVideoObserver.root === container) {
-    newCards.forEach(item => loorVideoObserver.observe(item));
-    return;
-  }
-  if (loorVideoObserver) loorVideoObserver.disconnect();
-
-  loorVideoObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      const card = entry.target;
-      const video = card.querySelector('.loor-video');
-      const loorId = card.dataset.loorId;
-
-      if (entry.isIntersecting) {
-        playLoorCard(card);
-        const nextVideo = card.nextElementSibling && card.nextElementSibling.querySelector && card.nextElementSibling.querySelector('.loor-video');
-        if (nextVideo) nextVideo.preload = 'auto';
-
-        if (!viewedLoorsSession.has(loorId)) {
-          viewedLoorsSession.add(loorId);
-          incrementLoorViews(loorId, card);
-        }
-      } else {
-        video.pause();
-        video.currentTime = 0;
-        const audio = card.querySelector('.loor-audio');
-        if (audio) {
-          audio.pause();
-          audio.currentTime = 0;
-        }
-      }
-    });
-  }, {
-    root: document.getElementById('loors-feed-container'),
-    threshold: 0.75
-  });
-
-  (newCards || document.querySelectorAll('.loor-item')).forEach(item => loorVideoObserver.observe(item));
+  LoorsEngine.register(newCards || [], document.getElementById('loors-feed-container'));
 }
 
 async function incrementLoorViews(loorId, card) {
@@ -615,12 +634,19 @@ async function handleUploadLoor(e) {
   submitBtn.textContent = 'Subiendo video...';
 
   try {
+    // Revisión liviana del archivo (pista de audio, códec, faststart). No bloquea la publicación.
+    try {
+      const report = await LoorsEngine.inspectFile(file);
+      if (report.warnings.length || report.notes.length) console.warn('[Loors] Revisión del archivo:', report);
+      if (report.warnings.length && typeof showToast === 'function') showToast(report.warnings[0]);
+    } catch (inspectErr) { console.warn('Sin revisión del archivo:', inspectErr); }
+
     const fileExt = file.name.split('.').pop();
     const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
 
     const { error: uploadError } = await db.storage
       .from('loors_videos')
-      .upload(filePath, file, { cacheControl: '31536000', upsert: false });
+      .upload(filePath, file, { cacheControl: '31536000', upsert: false, contentType: file.type || 'video/mp4' });
 
     if (uploadError) throw uploadError;
 

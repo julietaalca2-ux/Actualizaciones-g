@@ -149,7 +149,7 @@ function ensureExploreVideoObservers() {
     exploreVideoLoadObserver.unobserve(entry.target);
    }
   });
- }, { rootMargin: '250px 0px', threshold: 0 });
+ }, { root: document.querySelector('main'), rootMargin: '250px 0px', threshold: 0 });
 
  // 2) Controla cuáles se ven en pantalla (con ver 1 píxel ya cuenta)
  exploreVideoViewObserver = new IntersectionObserver(entries => {
@@ -359,7 +359,7 @@ function ensureExploreScrollObserver() {
     loadMoreExploreGrid();
    }
   }
- }, { root: null, rootMargin: '400px 0px', threshold: 0 });
+ }, { root: document.querySelector('main'), rootMargin: '400px 0px', threshold: 0 });
  observer.observe(sentinel);
 }
 

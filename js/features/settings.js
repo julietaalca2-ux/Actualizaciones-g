@@ -1,7 +1,7 @@
 /* Depende de: config.js (db); state.js (currentUser); utils.js (status);
    core/realtime.js (setupPresenceChannel)
    Expone: MENU_PREFS_CONFIG, saveMenuPreferences, loadMenuPreferences,
-   submitHelpReport, populateAccountCenter, updateUserPassword,
+   submitHelpReport, populateAccountCenter, linkGoogleAccount, refreshGoogleLinkStatus, updateUserPassword,
    THEME_COLORS, getSavedTheme, applyTheme, setTheme, initTheme */
 
 /* ---------- Temas (Automático · Blanco · Gris · Oscuro · Negro) ---------- */
@@ -100,6 +100,60 @@ function populateAccountCenter() {
  if (!currentUser) return;
  document.getElementById('passwordStatus').textContent = '';
  document.getElementById('newPasswordInput').value = '';
+ refreshGoogleLinkStatus();
+}
+
+/* ---------- Vinculación con Google (Centro de cuentas) ---------- */
+async function getGoogleIdentity() {
+ let identities = null;
+ try {
+  const { data, error } = await db.auth.getUserIdentities();
+  if (!error && data) identities = data.identities;
+ } catch (e) { /* versión vieja de supabase-js: se usa getUser() */ }
+ if (!identities) {
+  const { data } = await db.auth.getUser();
+  identities = (data && data.user && data.user.identities) || [];
+ }
+ return identities.find(i => i.provider === 'google') || null;
+}
+
+async function refreshGoogleLinkStatus() {
+ const statusEl = document.getElementById('googleIdentityStatus');
+ const btn = document.getElementById('googleLinkButton');
+ const txt = document.getElementById('googleLinkButtonText');
+ if (!statusEl || !btn || !txt) return;
+ statusEl.textContent = 'Comprobando estado...';
+ try {
+  const google = await getGoogleIdentity();
+  if (google) {
+   const email = google.identity_data && google.identity_data.email;
+   statusEl.textContent = email ? 'Vinculada: ' + email : 'Tu cuenta de Google está vinculada.';
+   txt.textContent = 'Cuenta de Google vinculada';
+   btn.disabled = true;
+   btn.classList.add('linked');
+  } else {
+   statusEl.textContent = 'No vinculada. Vinculala para entrar a esta misma cuenta con Google.';
+   txt.textContent = 'Vincular cuenta de Google';
+   btn.disabled = false;
+   btn.classList.remove('linked');
+  }
+ } catch (e) {
+  statusEl.textContent = 'No se pudo comprobar el estado.';
+  txt.textContent = 'Vincular cuenta de Google';
+  btn.disabled = false;
+ }
+}
+
+async function linkGoogleAccount() {
+ status('googleLinkStatus', 'Conectando con Google...');
+ const redirectTo = window.location.origin + window.location.pathname;
+ const { error } = await db.auth.linkIdentity({ provider: 'google', options: { redirectTo } });
+ if (error) {
+  const manualOff = /manual.?linking/i.test(error.message || '');
+  status('googleLinkStatus', manualOff
+   ? 'La vinculación manual está desactivada en Supabase (Authentication → Sign In / Providers → Allow manual linking).'
+   : 'No se pudo vincular: ' + error.message);
+ }
 }
 
 async function updateUserPassword() {

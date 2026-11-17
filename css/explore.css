@@ -55,7 +55,6 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
-  grid-auto-flow: dense;
 }
 .explore-grid { margin-top: 2px; }
 .explore-grid-item, .ig-grid-item {
@@ -101,28 +100,3 @@
 }
 .explore-grid-badge svg { width: 12px; height: 12px; fill: #ffffff; }
 
-
-/* Videos (Loors) en Explorar */
-.explore-grid-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: #0b0b0c;
-  pointer-events: none;
-}
-.explore-grid-item--tall {
-  grid-row: span 2;
-  aspect-ratio: 1 / 2;
-}
-.explore-grid-reel-icon {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 18px;
-  height: 18px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
-  pointer-events: none;
-}
-.explore-grid-reel-icon svg { width: 100%; height: 100%; fill: #ffffff; }

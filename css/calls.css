@@ -1,0 +1,236 @@
+/* ------------------------------------------------------------------------- */
+/* Cámara del chat                                                          */
+/* ------------------------------------------------------------------------- */
+#chatCameraModal {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: #000;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#chatCameraModal.active { display: flex; }
+#chatCameraVideo, #chatCameraPreview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+#chatCameraVideo.mirrored { transform: scaleX(-1); }
+#chatCameraPreview { display: none; object-fit: contain; }
+#chatCameraModal.has-photo #chatCameraPreview { display: block; }
+#chatCameraModal.has-photo #chatCameraVideo { visibility: hidden; }
+.chat-camera-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  left: 14px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 3;
+}
+.chat-camera-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 28px calc(env(safe-area-inset-bottom) + 26px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 3;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+}
+.chat-camera-bar--preview { display: none; }
+#chatCameraModal.has-photo .chat-camera-bar--live { display: none; }
+#chatCameraModal.has-photo .chat-camera-bar--preview { display: flex; }
+.chat-camera-shutter {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  padding: 0;
+}
+.chat-camera-shutter:active { background: #fff; }
+.chat-camera-side {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+}
+.chat-camera-flip { background: rgba(255, 255, 255, 0.18); cursor: pointer; }
+.chat-camera-flip svg { width: 24px; height: 24px; }
+.chat-camera-text-btn {
+  border: 0;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 13px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chat-camera-text-btn.primary { background: #fff; color: #000; }
+
+/* ------------------------------------------------------------------------- */
+/* Llamadas y videollamadas                                                 */
+/* ------------------------------------------------------------------------- */
+.call-avatar {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #2a2a2e;
+  display: grid;
+  place-items: center;
+  font-size: 48px;
+  color: #fff;
+}
+.call-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+#incomingCallOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 8, 10, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+#incomingCallOverlay.active { display: flex; }
+.incoming-call-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  text-align: center;
+  padding: 24px;
+}
+.incoming-call-card strong { font-size: 24px; font-weight: 700; margin-top: 10px; }
+.incoming-call-card span { font-size: 14px; opacity: 0.7; }
+.incoming-call-actions { display: flex; gap: 72px; margin-top: 44px; }
+.call-round-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  cursor: pointer;
+}
+.call-round-btn svg { width: 30px; height: 30px; }
+.call-round-btn.accept { background: #22c55e; }
+.call-round-btn.hangup { background: #ef4444; }
+.call-round-btn:active { transform: scale(0.92); }
+
+#callOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 850;
+  display: none;
+  background: #0b0b0d;
+  color: #fff;
+  overflow: hidden;
+}
+#callOverlay.active { display: block; }
+#callRemoteVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #0b0b0d;
+}
+#callOverlay.audio-only #callRemoteVideo { opacity: 0; }
+.call-audio-bg {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 35%, #2a2a31, #0b0b0d 70%);
+}
+#callOverlay.audio-only .call-audio-bg { display: flex; }
+/* En videollamada, mientras se conecta se ve el avatar de fondo */
+#callOverlay:not(.audio-only):not(.connected) .call-audio-bg { display: flex; }
+.call-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(env(safe-area-inset-top) + 18px) 20px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
+  z-index: 2;
+}
+.call-top strong { font-size: 18px; font-weight: 700; }
+.call-top span { font-size: 14px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+#callLocalVideo {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 74px);
+  right: 14px;
+  width: 104px;
+  height: 148px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: #1a1a1d;
+  z-index: 3;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+#callLocalVideo.mirrored { transform: scaleX(-1); }
+#callOverlay.audio-only #callLocalVideo { display: none; }
+.call-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24px 16px calc(env(safe-area-inset-bottom) + 28px);
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+  z-index: 4;
+}
+.call-ctrl-btn {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.call-ctrl-btn svg { width: 26px; height: 26px; }
+.call-ctrl-btn .slash { display: none; }
+.call-ctrl-btn.off { background: #fff; color: #111; }
+.call-ctrl-btn.off .slash { display: inline; }
+.call-ctrl-btn.hangup { background: #ef4444; }
+.call-ctrl-btn:active { transform: scale(0.93); }

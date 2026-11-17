@@ -15,13 +15,20 @@ async function init() {
     console.error('Error al inicializar Loors:', err);
   }
 
-  const { data } = await db.auth.getSession();
-  if (data.session?.user) {
-    await loadAccount(data.session.user);
+  try {
+    const { data } = await db.auth.getSession();
+    if (data.session?.user) {
+      await loadAccount(data.session.user);
+      hideSplashScreen();
+    } else {
+      hideSplashScreen();
+      showAuthOverlay();
+    }
+  } catch (err) {
+    // Sin red o error al cargar: nunca dejar la pantalla de carga congelada
+    console.error('Error al iniciar la app:', err);
     hideSplashScreen();
-  } else {
-    hideSplashScreen();
-    showAuthOverlay();
+    if (!currentUser) showAuthOverlay();
   }
 }
 

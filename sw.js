@@ -1,6 +1,6 @@
 /* ÖG — Service Worker (og-mobile-dev) */
 
-const VERSION = '1.5.0';
+const VERSION = '1.5.6';
 const CACHE_PREFIX = 'og-mobile-dev-';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 
@@ -59,6 +59,7 @@ const APP_SHELL = [
   'js/features/profile.js',
   'js/features/settings.js',
   'js/features/stories.js',
+  'js/features/loors-engine.js',
   'js/features/loors.js',
   'js/features/notes.js',
   'js/features/audio-library.js',
@@ -67,6 +68,7 @@ const APP_SHELL = [
   'js/features/verification-admin.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png'
 ].map(toURL);
 
@@ -139,7 +141,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirstImage(event, req));
     return;
   }
-  // Todo lo demás (API de Supabase, videos, audios) va directo a la red.
+  // Todo lo demás (API de Supabase, videos, audios) va directo a la red. Los videos NO se interceptan a propósito:
+  // el navegador necesita hablar con el servidor mediante HTTP Range (respuestas 206) y su propia caché de medios.
 });
 
 /* Imágenes: si ya se vieron, salen al instante de la caché (los nombres son únicos, no cambian).

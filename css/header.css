@@ -2,8 +2,8 @@
 /* Header Superior Fijo                                                      */
 /* ------------------------------------------------------------------------- */
 header {
-  height: 54px;
-  padding: env(safe-area-inset-top) 18px 0 18px;
+  height: var(--header-h, 54px);
+  padding: env(safe-area-inset-top, 0px) 18px 0 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -12,9 +12,15 @@ header {
   top: 0;
   left: 0;
   right: 0;
-  background: var(--bg-glass-strong);
+  max-width: 470px;
+  margin: 0 auto;
+  background: var(--bg-main);
   z-index: 100;
   box-sizing: content-box;
+  /* Capa propia de GPU: no vibra ni se despega al hacer scroll en iPhone/Android */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
 }
 .header-left-slot, .header-right-slot { 
   display: flex; 

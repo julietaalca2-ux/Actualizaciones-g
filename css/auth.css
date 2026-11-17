@@ -126,3 +126,9 @@
 .account-link-copy { display: flex; flex-direction: column; gap: 5px; }
 .account-link-copy span { color: var(--text-secondary); font-size: 13px; }
 #googleLinkButton:disabled { opacity: .65; cursor: default; }
+
+/* Logo oficial de Google (4 colores) en los botones */
+.google-logo { width: 20px; height: 20px; flex-shrink: 0; display: block; }
+.google-auth-button:disabled { opacity: .75; cursor: default; }
+.google-auth-button:disabled:active { transform: none; }
+.google-auth-button.linked::after { content: '✓'; color: var(--accent-green); font-weight: 700; margin-left: 2px; }

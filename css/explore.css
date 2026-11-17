@@ -4,13 +4,18 @@
 .explore-top-bar {
   padding: 8px 12px 10px;
   position: sticky;
-  top: calc(54px + env(safe-area-inset-top, 0px));
-  background: var(--bg-glass-strong);
+  top: 0;
+  background: var(--bg-main);
   z-index: 40;
   border-bottom: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+/* Sin encabezado en Explorar: el buscador queda pegado arriba (respetando la muesca / barra de estado) */
+body[data-tab="explore"] .explore-top-bar {
+  top: 0;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
 }
 .explore-search-input {
   width: 100%;

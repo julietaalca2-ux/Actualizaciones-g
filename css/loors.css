@@ -4,7 +4,7 @@
 #loors-section {
   position: fixed;
   inset: 0;
-  bottom: 60px; /* Altura de la barra de navegación inferior de ÖG */
+  bottom: calc(var(--nav-h, 50px) + env(safe-area-inset-bottom, 0px)); /* termina justo donde empieza la barra inferior (incluye el área segura del iPhone) */
   background-color: #000000;
   z-index: 101; /* por encima del header fijo (z-index 100); la barra inferior queda libre por bottom: 60px */
   display: none;
@@ -69,6 +69,8 @@
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
+  overscroll-behavior-y: contain; /* el rebote no arrastra la página de atrás */
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
 }
@@ -89,6 +91,7 @@
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  contain: layout paint style; /* cada video se maqueta/pinta aparte: menos trabajo al deslizar */
 }
 
 .loor-video {
@@ -96,6 +99,7 @@
   height: 100%;
   object-fit: cover;
   cursor: pointer;
+  background: #000;
 }
 
 /* En computadoras, mantener formato vertical centrado 9:16 */
@@ -598,3 +602,55 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ==========================================
+   Botón de sonido de Loors (preferencia por sesión)
+   ========================================== */
+.loors-sound-btn {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 58px);
+  right: 14px;
+  z-index: 26;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.loors-sound-btn svg { width: 20px; height: 20px; }
+.loors-sound-btn .ico-off { display: none; }
+.loors-sound-btn.is-off .ico-on { display: none; }
+.loors-sound-btn.is-off .ico-off { display: block; }
+.loors-sound-btn.needs-tap { animation: loorsSoundPulse 1.4s ease-in-out infinite; }
+@keyframes loorsSoundPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+  50% { box-shadow: 0 0 0 9px rgba(255, 255, 255, 0); }
+}
+
+.loors-sound-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 26;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.loors-sound-hint.show { opacity: 1; pointer-events: auto; }

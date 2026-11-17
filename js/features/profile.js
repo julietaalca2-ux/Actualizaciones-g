@@ -1,3 +1,11 @@
+/* Marca un elemento para que verification.js le ponga la insignia (se repinta si cambió el texto) */
+function markVerifyUser(el, userId) {
+ if (!el || !userId) return;
+ el.removeAttribute('data-verify-done');
+ el.setAttribute('data-verify-user', userId);
+ if (window.VerificationSystem) VerificationSystem.decorateUsers(el.parentNode || document);
+}
+
 /* Depende de: config.js (db); state.js (currentUser, myProfile, viewedProfile, isFollowing,
    profilesCache, stagedAvatarBlob, cachedFeedPosts, cachedFollowingIds, highlightsCacheByUser);
    utils.js (setAvatarContent, setPreviewBlobUrl, revokePreviewBlobUrl, compressImageBlob,
@@ -21,6 +29,7 @@ function updateProfileUI() {
 
  document.getElementById('profile-actions').style.display = 'flex';
  document.getElementById('myname').textContent = myProfile?.display_name || myProfile?.username || 'Mi perfil';
+ markVerifyUser(document.getElementById('myname'), myProfile?.id || currentUser?.id);
  document.getElementById('mypronouns').textContent = myProfile?.pronouns ? `· ${myProfile.pronouns}` : '';
  document.getElementById('myusername').textContent = '@' + (myProfile?.username || '');
  document.getElementById('mybio').textContent = myProfile?.bio || '';
@@ -315,6 +324,7 @@ function shareProfileLink() {
 function renderPublicProfileHeader(profile) {
  viewedProfile = profile;
  document.getElementById('publicname').textContent = profile.display_name || profile.username;
+ markVerifyUser(document.getElementById('publicname'), profile.id);
  document.getElementById('publicpronouns').textContent = profile.pronouns ? `· ${profile.pronouns}` : '';
  document.getElementById('publicheadername').textContent = profile.username;
  document.getElementById('publicusername').textContent = '@' + profile.username;
@@ -524,7 +534,7 @@ async function renderUsersInFollowModal(userIds) {
 
   const info = document.createElement('div');
   info.className = 'public-user-info';
-  info.innerHTML = `<strong>${profile.display_name || profile.username}</strong><small>@${profile.username}</small>`;
+  info.innerHTML = `<strong data-verify-user="${profile.id}">${profile.display_name || profile.username}</strong><small>@${profile.username}</small>`;
 
   item.append(info);
 

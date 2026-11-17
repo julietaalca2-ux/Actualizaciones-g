@@ -19,23 +19,19 @@ function initLoors() {
   bindLoorsUIEvents();
 }
 
-async function openLoorsSection(startLoorId = null) {
+async function openLoorsSection() {
   initLoors();
   const section = document.getElementById('loors-section');
   if (!section) return;
-  // Los videos de Explorar se pausan mientras se ven los Loors
-  if (typeof pauseExploreVideos === 'function') pauseExploreVideos();
   section.classList.add('active');
-  await loadLoorsFeed(startLoorId);
+  await loadLoorsFeed();
 }
 
 function closeLoorsSection() {
   const section = document.getElementById('loors-section');
   if (!section) return;
-  const wasOpen = section.classList.contains('active');
   section.classList.remove('active');
   document.querySelectorAll('.loor-video, .loor-audio').forEach(media => media.pause());
-  if (wasOpen && typeof resumeExploreVideos === 'function') resumeExploreVideos();
 }
 
 // Reproduce el video de una tarjeta y, si tiene música elegida, también su audio
@@ -61,7 +57,7 @@ function pauseLoorCard(card) {
   if (audio) audio.pause();
 }
 
-async function loadLoorsFeed(startLoorId = null) {
+async function loadLoorsFeed() {
   const container = document.getElementById('loors-feed-container');
   if (!container) return;
 
@@ -252,16 +248,6 @@ async function loadLoorsFeed(startLoorId = null) {
 
     container.appendChild(card);
   });
-
-  // Si se llegó desde Explorar, se salta directo al video tocado (sin animación)
-  if (startLoorId) {
-    const target = container.querySelector(`.loor-item[data-loor-id="${CSS.escape(String(startLoorId))}"]`);
-    if (target) {
-      container.style.scrollBehavior = 'auto';
-      container.scrollTop = target.offsetTop - container.offsetTop;
-      requestAnimationFrame(() => { container.style.scrollBehavior = ''; });
-    }
-  }
 
   setupLoorAutoplayObserver();
 }

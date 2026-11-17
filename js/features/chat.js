@@ -8,11 +8,39 @@
    Expone: checkGlobalUnreadMessages, loadConversations, renderConversationsDOM,
    searchUsersForChat, openDirectChatWithUser, openChatRoom, buildChatMessageNode,
    appendChatMessageNode, scrollToBottomChat, triggerReplyToMessage, cancelReply,
-   sendChatMessage, openChatDetailsPage, toggleChatDetailsMenu, handleChatActionMenu,
+   sendChatMessage, postChatSystemMessage, encodeChatPayload, parseChatPayload, chatContentPreview, openChatDetailsPage, toggleChatDetailsMenu, handleChatActionMenu,
    openChatRecipientProfile, triggerChatSearch, openMuteOptionsModal, openChatSubSettings,
    handleChatInputKey, autoGrowChatInput, retryChatMessage, jumpToChatMessage */
 
 const MESSAGE_SELECT_FIELDS = 'id, conversation_id, sender_id, content, reply_to_id, reply_to_snippet, created_at';
+
+/* Adjuntos y registros de llamada: se guardan en `content` con un prefijo invisible + JSON,
+   así no hace falta cambiar la tabla `messages`. Tipos: image, video, file, call. */
+const CHAT_PAYLOAD_PREFIX = '\u200bOG:';
+
+function encodeChatPayload(obj) {
+ return CHAT_PAYLOAD_PREFIX + JSON.stringify(obj);
+}
+
+function parseChatPayload(content) {
+ if (typeof content !== 'string' || !content.startsWith(CHAT_PAYLOAD_PREFIX)) return null;
+ try {
+  const obj = JSON.parse(content.slice(CHAT_PAYLOAD_PREFIX.length));
+  return obj && typeof obj === 'object' ? obj : null;
+ } catch (e) { return null; }
+}
+
+/* Texto corto para la lista de conversaciones y para las respuestas citadas */
+function chatContentPreview(content) {
+ const p = parseChatPayload(content);
+ if (!p) return content;
+ if (p.t === 'image') return '📷 Foto';
+ if (p.t === 'video') return '🎥 Video';
+ if (p.t === 'audio') return '🎤 Mensaje de voz';
+ if (p.t === 'file') return '📎 ' + (p.n || 'Archivo');
+ if (p.t === 'call') return p.v ? '📹 Videollamada' : '📞 Llamada';
+ return 'Mensaje';
+}
 
 async function checkGlobalUnreadMessages() {
  if (!currentUser) return;
@@ -123,7 +151,7 @@ async function loadConversations() {
    return {
     conversationId: convId,
     profile,
-    lastMessage: lastMsg ? (lastMsg.sender_id === currentUser.id ? 'Tú: ' : '') + lastMsg.content : 'Conversación iniciada',
+    lastMessage: lastMsg ? (lastMsg.sender_id === currentUser.id ? 'Tú: ' : '') + chatContentPreview(lastMsg.content) : 'Conversación iniciada',
     time: lastMsg ? formatDate(lastMsg.created_at) : '',
     timestamp: lastMsg ? new Date(lastMsg.created_at).getTime() : 0,
     isUnread
@@ -302,6 +330,7 @@ async function openChatRoom(conversationId, recipientProfile) {
  chatStickToBottom = true;
  cancelReply();
  initChatInteractions();
+ if (typeof updateChatSendMicState === 'function') updateChatSendMicState();
 
  document.querySelectorAll('main>div').forEach(x => x.classList.remove('active'));
  document.getElementById('chatRoomPage').classList.add('active');
@@ -371,10 +400,23 @@ function buildChatMessageNode(msg) {
   bubble.append(rep);
  }
 
- const textDiv = document.createElement('div');
- textDiv.className = 'chat-bubble-text';
- textDiv.textContent = msg.content;
- bubble.append(textDiv);
+ const payload = parseChatPayload(msg.content);
+ const payloadNode = payload && typeof buildChatPayloadNode === 'function' ? buildChatPayloadNode(payload, msg, isMine) : null;
+ if (payloadNode) {
+  bubble.dataset.snippet = chatContentPreview(msg.content);
+  if (payload.t === 'call') {
+   bubble.classList.add('chat-call-log');
+   bubble.dataset.sender = 'call-log';
+  } else {
+   bubble.classList.add('has-media');
+  }
+  bubble.append(payloadNode);
+ } else {
+  const textDiv = document.createElement('div');
+  textDiv.className = 'chat-bubble-text';
+  textDiv.textContent = msg.content;
+  bubble.append(textDiv);
+ }
 
  const timeDiv = document.createElement('div');
  timeDiv.className = 'chat-bubble-time';
@@ -523,7 +565,8 @@ function initChatInteractions() {
 }
 
 function replyToBubble(bubble) {
- const text = bubble.querySelector('.chat-bubble-text')?.textContent || '';
+ if (bubble.classList.contains('chat-call-log')) return;
+ const text = bubble.dataset.snippet || bubble.querySelector('.chat-bubble-text')?.textContent || '';
  triggerReplyToMessage(bubble.dataset.msgId, text);
 }
 
@@ -559,6 +602,7 @@ function cancelReply() {
 // Campo de texto: crece hasta 5 líneas; Enter envía en computadora, en el celular Enter hace salto de línea
 function autoGrowChatInput(el) {
  if (!el) return;
+ if (typeof updateChatSendMicState === 'function') updateChatSendMicState(el);
  const container = document.getElementById('chatMessagesContainer');
  const stick = container ? isChatNearBottom(container) : false;
  if (!el.value) {
@@ -664,11 +708,36 @@ async function deliverChatMessage(payload, node, tempId) {
 }
 
 function retryChatMessage(node) {
- if (!node || !node._payload) return;
+ if (!node) return;
+ // Adjunto que no llegó a subirse: se vuelve a intentar la subida completa
+ if (!node._payload && typeof node._retryFn === 'function') { node._retryFn(); return; }
+ if (!node._payload) return;
  node.classList.remove('is-error');
  node.classList.add('is-sending');
  setChatNodeStatus(node, 'Enviando…');
  deliverChatMessage(node._payload, node, node._tempId);
+}
+
+/* Inserta un mensaje ya armado (por ejemplo el registro de una llamada) y lo muestra si el chat está abierto */
+async function postChatSystemMessage(conversationId, content) {
+ if (!currentUser || !conversationId) return null;
+ try {
+  const { data, error } = await db.from('messages')
+   .insert({ conversation_id: conversationId, sender_id: currentUser.id, content })
+   .select(MESSAGE_SELECT_FIELDS)
+   .single();
+  if (error || !data) return null;
+  if (activeConversationId === conversationId && document.getElementById('chatRoomPage')?.classList.contains('active')) {
+   appendChatMessageNode(data);
+   scrollToBottomChat();
+  }
+  const prev = prefetchedMessagesByConv[conversationId] || [];
+  prefetchedMessagesByConv[conversationId] = [...prev, data];
+  ogCache.set(`chat_msgs_${conversationId}`, prefetchedMessagesByConv[conversationId].slice(-50));
+  cachedConversationsList = null;
+  ogCache.remove('conversations');
+  return data;
+ } catch (e) { return null; }
 }
 
 function openChatDetailsPage() {

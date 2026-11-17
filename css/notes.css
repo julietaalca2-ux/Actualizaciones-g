@@ -1,0 +1,205 @@
+/* ==========================================
+   NOTAS (fila arriba de Chat, ventana para crear y para ver)
+   ========================================== */
+.notes-row {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 18px 18px 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.notes-row::-webkit-scrollbar {
+  display: none;
+}
+
+.note-item {
+  flex: 0 0 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.note-bubble {
+  position: relative;
+  z-index: 1;
+  max-width: 86px;
+  min-height: 28px;
+  margin-bottom: -10px;
+  padding: 6px 9px;
+  background: var(--bg-container-lowest);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: center;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-bubble-empty {
+  color: var(--text-muted);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.note-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-muted);
+  border: 2px solid var(--bg-main);
+  box-shadow: var(--shadow-soft);
+}
+
+.note-label {
+  margin-top: 6px;
+  max-width: 72px;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ventana para crear la nota */
+.note-text-wrap {
+  position: relative;
+  padding-top: 14px;
+}
+
+.note-text-input {
+  width: 100%;
+  border: 1px solid var(--border-medium);
+  border-radius: 14px;
+  padding: 12px 52px 12px 14px;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.note-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 14px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.note-audio-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.note-audio-selected {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--accent-blue-subtle);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.note-audio-selected span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-audio-selected button {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.note-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding-top: 10px;
+}
+
+.note-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.note-delete-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: #ba1a1a;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px;
+  cursor: pointer;
+}
+
+/* Ventana para ver la nota de otra persona */
+.note-viewer-body {
+  padding: 14px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note-viewer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.note-viewer-head .note-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.note-viewer-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.note-viewer-time {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.note-viewer-text {
+  font-size: 1.05rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.note-viewer-audio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-subtle);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.note-viewer-link {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.note-viewer-profile-btn {
+  width: 100%;
+  padding: 11px;
+}

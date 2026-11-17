@@ -1,20 +1,4 @@
 /* ========================================================================= */
 /* ÖG — SOCIAL | CSS ENTRY POINT                                             */
-/* Los módulos se cargan en el mismo orden del CSS original.                  */
+/* Los módulos CSS se cargan en paralelo desde index.html en el mismo orden. */
 /* ========================================================================= */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-@import url('./variables.css');
-@import url('./components.css');
-@import url('./auth.css');
-@import url('./header.css');
-@import url('./layout.css');
-@import url('./navigation.css');
-@import url('./stories.css');
-@import url('./camera.css');
-@import url('./story-viewer.css');
-@import url('./feed.css');
-@import url('./explore.css');
-@import url('./chat.css');
-@import url('./profile.css');
-@import url('./settings.css');

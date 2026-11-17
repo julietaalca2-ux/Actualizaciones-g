@@ -33,10 +33,27 @@
   background: #ffffff;
   transition: width 0.2s ease;
 }
-.story-progress-segment.completed .story-progress-fill,
+.story-progress-segment.completed .story-progress-fill { width: 100%; }
+/* La barra activa se llena sola en --story-duration (5 s) y al terminar pasa a la siguiente foto */
 .story-progress-segment.active .story-progress-fill {
-  width: 100%;
+  width: 0%;
+  transition: none;
+  animation: ogStoryFill var(--story-duration, 5s) linear forwards;
 }
+@keyframes ogStoryFill { from { width: 0%; } to { width: 100%; } }
+/* Pausa: mantener presionado, cargando imagen o menú abierto */
+#storyViewer.is-held .story-progress-fill,
+#storyViewer.is-loading .story-progress-fill,
+#highlightViewer.is-held .story-progress-fill,
+#highlightViewer.is-loading .story-progress-fill,
+#highlightViewer.is-menu-open .story-progress-fill {
+  animation-play-state: paused;
+}
+/* Al mantener presionado se oculta la interfaz, como en Instagram */
+#storyViewer.is-held .story-top-bar,
+#storyViewer.is-held .story-bottom-bar,
+#highlightViewer.is-held .story-top-bar,
+#highlightViewer.is-held .story-bottom-bar { opacity: 0; transition: opacity 0.15s ease; }
 .story-top-bar { 
   display: flex; 
   align-items: center; 
@@ -50,7 +67,8 @@
 .story-user-info .story-avatar-container { width: 34px; height: 34px; margin: 0; }
 .story-username-text { font-size: 13px; font-weight: 600; color: #ffffff; }
 .story-time-text { font-size: 11px; color: #a1a1aa; margin-left: 6px; }
-#storyViewer .story-top-bar button[onclick="closeStoryViewer()"] {
+#storyViewer .story-top-bar button[onclick="closeStoryViewer()"],
+#highlightViewer .story-top-bar button[onclick="closeHighlightViewer()"] {
   width: 44px;
   height: 44px;
   min-width: 44px;
@@ -78,7 +96,8 @@
   touch-action: manipulation;
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
 }
-#storyViewer .story-top-bar button[onclick="closeStoryViewer()"]:active {
+#storyViewer .story-top-bar button[onclick="closeStoryViewer()"]:active,
+#highlightViewer .story-top-bar button[onclick="closeHighlightViewer()"]:active {
   transform: scale(0.9);
   opacity: 0.7;
 }
@@ -135,3 +154,38 @@
 .story-action-icon-btn svg { width: 26px; height: 26px; stroke: #ffffff; fill: none; stroke-width: 2; }
 .story-action-icon-btn.liked svg { fill: var(--accent-red); stroke: var(--accent-red); }
 
+
+/* ------------------------------------------------------------------------- */
+/* Opciones de la destacada (eliminar)                                      */
+/* ------------------------------------------------------------------------- */
+#highlightManageSheet {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+#highlightManageSheet.active { display: flex; }
+.highlight-manage-card {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px calc(env(safe-area-inset-bottom) + 12px);
+}
+.highlight-manage-btn {
+  width: 100%;
+  padding: 15px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #232326;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.highlight-manage-btn.danger { color: #ff453a; }
+.highlight-manage-btn:active { opacity: 0.7; }

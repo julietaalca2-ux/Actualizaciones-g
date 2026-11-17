@@ -5,16 +5,12 @@
   padding: 8px 12px 10px;
   position: sticky;
   top: calc(54px + env(safe-area-inset-top, 0px));
-  background: var(--bg-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-glass-strong);
   z-index: 40;
   border-bottom: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 .explore-search-input {
   width: 100%;

@@ -1,0 +1,149 @@
+/* ==========================================================================
+   ANIMATIONS.CSS - ÖG
+   Capa NUEVA y aditiva: no reemplaza ningún estilo existente.
+   Solo anima con transform/opacity (los más baratos para el GPU).
+   ========================================================================== */
+
+:root {
+  --og-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --og-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---------- Keyframes ---------- */
+@keyframes ogFadeUp   { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes ogFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ogPopIn    { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes ogSlideL   { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes ogSlideR   { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes ogHeartPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 65% { transform: scale(0.92); } 100% { transform: scale(1); } }
+@keyframes ogNavBounce{ 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-3px) scale(1.12); } 100% { transform: translateY(0) scale(1); } }
+@keyframes ogShimmer  { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes ogToastIn  { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes ogBadgePop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+/* ---------- Cambio de pestaña (al tocar la barra inferior) ---------- */
+main > div.og-tab-enter {
+  animation: ogFadeUp 0.24s var(--og-ease) both;
+}
+/* Explorar y Perfil tienen grillas/videos pesados: sin animación de pestaña para que no se trabe */
+#explore.og-tab-enter, #profile.og-tab-enter { animation: none; }
+
+/* ---------- Feed: publicaciones que aparecen ---------- */
+.post {
+  animation: ogFadeUp 0.4s var(--og-ease) both;
+  /* No pinta publicaciones fuera de pantalla: scroll más fluido en feeds largos */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 540px;
+}
+.post:nth-child(2) { animation-delay: 0.05s; }
+.post:nth-child(3) { animation-delay: 0.10s; }
+.post:nth-child(n+4) { animation-delay: 0.12s; }
+
+/* ---------- Likes y botones de acción ---------- */
+.post-action-btn { transition: transform 0.15s var(--og-ease); }
+.post-action-btn:active { transform: scale(0.88); }
+.post-action-btn.liked svg { animation: ogHeartPop 0.45s var(--og-ease-spring); }
+
+/* ---------- Mensajes ---------- */
+.dm-conv-item { animation: ogSlideL 0.32s var(--og-ease) both; transition: background-color 0.15s ease, transform 0.15s var(--og-ease); }
+.dm-conv-item:nth-child(2) { animation-delay: 0.04s; }
+.dm-conv-item:nth-child(3) { animation-delay: 0.08s; }
+.dm-conv-item:nth-child(4) { animation-delay: 0.12s; }
+.dm-conv-item:nth-child(n+5) { animation-delay: 0.15s; }
+.dm-conv-item:active { transform: scale(0.985); }
+
+.chat-bubble { animation: ogPopIn 0.22s var(--og-ease) backwards; transform-origin: bottom center; }
+.chat-date-sep { animation: ogFadeIn 0.3s ease both; }
+.dm-unread-dot, .nav-msg-badge.active { animation: ogBadgePop 0.35s var(--og-ease-spring); }
+
+/* ---------- Comentarios ---------- */
+.comment-item { animation: ogFadeUp 0.28s var(--og-ease) both; }
+
+/* ---------- Explorar / cuadrículas ---------- */
+.explore-grid-item, .ig-grid-item { transition: transform 0.15s var(--og-ease); } /* sin animación de entrada: se reiniciaba en cada cambio de pestaña */
+.explore-grid-item:active, .ig-grid-item:active { transform: scale(0.97); }
+
+/* ---------- Historias y destacadas ---------- */
+.story, .highlight-item { transition: transform 0.15s var(--og-ease); }
+.story:nth-child(2), .highlight-item:nth-child(2) { animation-delay: 0.04s; }
+.story:nth-child(3), .highlight-item:nth-child(3) { animation-delay: 0.08s; }
+.story:nth-child(4), .highlight-item:nth-child(4) { animation-delay: 0.12s; }
+.story:nth-child(n+5), .highlight-item:nth-child(n+5) { animation-delay: 0.15s; }
+.story:active, .highlight-item:active { transform: scale(0.94); }
+
+/* ---------- Perfil ---------- */
+.profile-header-modern { }
+.profile-stat-box { }
+.profile-tab-btn { transition: color 0.2s ease, transform 0.15s var(--og-ease); }
+.profile-tab-btn:active { transform: scale(0.95); }
+.profile-tab-content-pane.active { }
+
+/* ---------- Barra inferior ---------- */
+nav button { transition: color 0.2s ease, transform 0.15s var(--og-ease); -webkit-tap-highlight-color: transparent; }
+nav button:active { transform: scale(0.9); }
+nav button.active svg, nav button.active .nav-avatar-ring { animation: ogNavBounce 0.35s var(--og-ease); }
+
+/* ---------- Botones en general (feedback al tocar) ---------- */
+button, .primary, .secondary, .danger-btn { -webkit-tap-highlight-color: transparent; }
+.primary, .secondary, .danger-btn, .modal-close-btn, .chat-send-btn, .chat-tool-btn, .chat-mic-btn, .chat-call-btn {
+  transition: transform 0.15s var(--og-ease), opacity 0.2s ease, background-color 0.2s ease;
+}
+.primary:active, .secondary:active, .danger-btn:active, .modal-close-btn:active,
+.chat-send-btn:active, .chat-tool-btn:active, .chat-mic-btn:active, .chat-call-btn:active {
+  transform: scale(0.95);
+}
+
+/* ---------- Buscador ---------- */
+.explore-search-wrapper { transition: transform 0.2s var(--og-ease), box-shadow 0.2s ease; }
+.explore-search-wrapper:focus-within { transform: scale(1.01); }
+
+/* ---------- Imágenes: aparecen suaves al cargar ---------- */
+img.og-img-fade { opacity: 0; transition: opacity 0.35s ease; }
+img.og-img-fade.og-img-loaded { opacity: 1; }
+
+/* ---------- Skeleton reutilizable (clase opcional: .og-skeleton) ---------- */
+.og-skeleton {
+  background: linear-gradient(90deg, var(--border-light, #e5e5ea) 25%, rgba(255,255,255,0.35) 50%, var(--border-light, #e5e5ea) 75%);
+  background-size: 200% 100%;
+  animation: ogShimmer 1.4s linear infinite;
+  border-radius: 8px;
+}
+
+/* ---------- Aviso de conexión ---------- */
+#ogToast {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 50%;
+  transform: translateX(-50%); z-index: 99999;
+  padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: #111; color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  animation: ogToastIn 0.3s var(--og-ease) both; pointer-events: none; max-width: 90vw; text-align: center;
+}
+#ogToast.ok { background: #16a34a; }
+#ogToast.warn { background: #dc2626; }
+
+/* ==========================================================================
+   MODO LIVIANO: se activa solo en teléfonos de pocos recursos / ahorro de datos.
+   Quita el desenfoque (lo más pesado para el GPU) y deja el fondo casi sólido.
+   ========================================================================== */
+html.og-lite *, html.og-lite *::before, html.og-lite *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html.og-lite { --bg-glass: var(--bg-glass-strong); }
+html.og-lite .post, html.og-lite .dm-conv-item, html.og-lite .chat-bubble,
+html.og-lite .explore-grid-item, html.og-lite .ig-grid-item { animation-duration: 0.01ms; animation-delay: 0s !important; }
+
+/* Pausa animaciones infinitas cuando la app está en segundo plano */
+html.og-hidden *, html.og-hidden *::before, html.og-hidden *::after { animation-play-state: paused !important; }
+
+/* ==========================================================================
+   Accesibilidad: respeta "reducir movimiento" del sistema
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

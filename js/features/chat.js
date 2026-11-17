@@ -1,8 +1,9 @@
 /* Depende de: config.js (db); state.js (currentUser, profilesCache, onlineUsersMap,
    activeConversationId, activeRecipientProfile, replyingToMessageId, replyingToSnippet,
-   cachedConversationsList, dmSearchTimer); utils.js (formatDate, createAvatarNode,
-   setAvatarContent); core/navigation.js (showTab)
-   En tiempo de ejecución usa funciones de otros módulos: openPublicProfile (profile.js)
+   cachedConversationsList, dmSearchTimer, viewedProfile); utils.js (formatDate,
+   createAvatarNode, setAvatarContent); core/navigation.js (showTab)
+   En tiempo de ejecución usa funciones de otros módulos: openPublicProfile (profile.js),
+   showAuthOverlay (auth.js)
    Expone: checkGlobalUnreadMessages, loadConversations, renderConversationsDOM,
    searchUsersForChat, openDirectChatWithUser, openChatRoom, buildChatMessageNode,
    appendChatMessageNode, scrollToBottomChat, triggerReplyToMessage, cancelReply,
@@ -393,36 +394,103 @@ async function searchUsersForChat() {
   }, 220);
 }
 
-async function openDirectChatWithUser(recipientId) {
-  if (!currentUser || !recipientId || recipientId === currentUser.id) return;
+async function openDirectChatWithUser(recipientId, triggerBtn = null) {
+  const targetId = recipientId || viewedProfile?.id;
+  if (!currentUser) {
+    if (typeof showAuthOverlay === 'function') showAuthOverlay();
+    return;
+  }
+  if (!targetId || targetId === currentUser.id) return;
+
+  const btn = triggerBtn || document.querySelector('#publicprofile .profile-action-buttons-row button.secondary');
+  const originalText = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Abriendo...';
+  }
 
   try {
-    const { data: convId, error } = await db.rpc('get_or_create_conversation', {
+    let convId = null;
+
+    // 1. Intentar obtener o crear la conversación mediante RPC
+    const { data: rpcConvId, error: rpcError } = await db.rpc('get_or_create_conversation', {
       user_a: currentUser.id,
-      user_b: recipientId
+      user_b: targetId
     });
 
-    if (error || !convId) {
-      throw error || new Error('No se pudo obtener el ID de conversación.');
+    if (!rpcError && rpcConvId) {
+      convId = rpcConvId;
+    } else {
+      // 2. Respaldo directo si la RPC no responde o tiene otra firma
+      const { data: myParts } = await db
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', currentUser.id);
+
+      const myConvIds = (myParts || []).map(p => p.conversation_id);
+      if (myConvIds.length > 0) {
+        const { data: shared } = await db
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', targetId)
+          .in('conversation_id', myConvIds)
+          .limit(1)
+          .maybeSingle();
+
+        if (shared?.conversation_id) {
+          convId = shared.conversation_id;
+        }
+      }
+
+      if (!convId) {
+        const { data: newConv, error: convErr } = await db
+          .from('conversations')
+          .insert({})
+          .select('id')
+          .single();
+
+        if (convErr || !newConv) throw convErr || new Error('No se pudo crear la conversación.');
+        convId = newConv.id;
+
+        const { error: partErr } = await db
+          .from('conversation_participants')
+          .insert([
+            { conversation_id: convId, user_id: currentUser.id, last_read_at: new Date().toISOString() },
+            { conversation_id: convId, user_id: targetId, last_read_at: null }
+          ]);
+
+        if (partErr) throw partErr;
+      }
     }
 
-    let profile = profilesCache[recipientId];
+    let profile = profilesCache[targetId] || (viewedProfile?.id === targetId ? viewedProfile : null);
     if (!profile) {
       const { data: fetchedProfile } = await db
         .from('og_profiles')
         .select(OG_CHAT_PROFILE_FIELDS)
-        .eq('id', recipientId)
+        .eq('id', targetId)
         .single();
       profile = fetchedProfile;
     }
 
-    if (!profile) return;
-    profilesCache[recipientId] = profile;
+    if (!profile) throw new Error('No se encontró el perfil del destinatario.');
+
+    profilesCache[targetId] = profile;
     cachedConversationsList = null;
 
     await openChatRoom(convId, profile);
   } catch (e) {
     console.error('ÖG Chat - Error abriendo chat directo:', e);
+    const statusEl = document.getElementById('publicstatus');
+    if (statusEl) {
+      statusEl.textContent = 'No se pudo abrir el chat. Intentá de nuevo.';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText || 'Mensaje';
+    }
   }
 }
 

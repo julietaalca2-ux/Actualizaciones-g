@@ -159,12 +159,15 @@ function showTab(id, btn) {
  const profileIcons = document.getElementById('header-profile-icons');
  const headerPlusBtn = document.getElementById('headerPlusBtn');
  const headerLogoSlot = document.getElementById('headerLogoSlot');
+ const headerUsernameSlot = document.getElementById('headerUsernameSlot');
  const bottomNavBar = document.getElementById('bottomNavBar');
 
  if (bottomNavBar) {
   bottomNavBar.style.display = 'flex';
   bottomNavBar.classList.remove('nav-hidden');
  }
+
+ if (headerUsernameSlot) headerUsernameSlot.style.display = (id === 'profile') ? 'flex' : 'none';
 
  if (id === 'feed') {
   if (headerLogoSlot) headerLogoSlot.style.display = 'flex';
@@ -227,6 +230,7 @@ function openMenuSection() {
  if (bottomNavBar) bottomNavBar.style.display = 'none';
 
  document.getElementById('headerLogoSlot').style.display = 'none';
+ const hus = document.getElementById('headerUsernameSlot'); if (hus) hus.style.display = 'none';
  document.getElementById('headerPlusBtn').style.display = 'none';
  document.getElementById('header-default-icons').style.display = 'none';
  document.getElementById('header-profile-icons').style.display = 'none';

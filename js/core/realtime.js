@@ -18,6 +18,7 @@ function invalidateActivityCacheAndRefreshIfVisible() {
 }
 
 function setupPresenceChannel() {
+ if (typeof ogStartLastSeenHeartbeat === 'function') ogStartLastSeenHeartbeat();
  if (presenceChannel) {
   db.removeChannel(presenceChannel);
   presenceChannel = null;
@@ -35,6 +36,9 @@ function setupPresenceChannel() {
  });
 
  presenceChannel
+  .on('presence', { event: 'leave' }, ({ key }) => {
+   if (typeof ogMarkUserLeft === 'function') ogMarkUserLeft(key);
+  })
   .on('presence', { event: 'sync' }, () => {
    const state = presenceChannel.presenceState();
    onlineUsersMap = {};
@@ -46,19 +50,7 @@ function setupPresenceChannel() {
     if (d) d.classList.add('active');
    });
 
-   if (activeRecipientProfile && onlineUsersMap[activeRecipientProfile.id]) {
-    document.getElementById('chatRoomOnlineDot')?.classList.add('active');
-    const sub = document.getElementById('chatRoomStatusSub');
-    if (sub) sub.textContent = 'En línea';
-    const detStatus = document.getElementById('chatDetailsActivityStatus');
-    if (detStatus) { detStatus.textContent = 'En línea'; detStatus.style.color = '#22c55e'; }
-   } else if (activeRecipientProfile) {
-    document.getElementById('chatRoomOnlineDot')?.classList.remove('active');
-    const sub = document.getElementById('chatRoomStatusSub');
-    if (sub) sub.textContent = 'Desconectado';
-    const detStatus = document.getElementById('chatDetailsActivityStatus');
-    if (detStatus) { detStatus.textContent = 'Desconectado'; detStatus.style.color = '#888888'; }
-   }
+   if (activeRecipientProfile && typeof ogRefreshChatStatus === 'function') ogRefreshChatStatus();
   })
   .subscribe(async status => {
    if (status === 'SUBSCRIBED') {
@@ -80,16 +72,39 @@ function setupRealtimeNotifications() {
    if (payload.new.following_id === currentUser?.id) {
     invalidateActivityCacheAndRefreshIfVisible();
     loadStoriesData();
+    if (typeof ogNotifyFromRealtime === 'function') ogNotifyFromRealtime('follow', payload.new);
+   }
+  })
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follow_requests' }, payload => {
+   if (payload.new?.target_id === currentUser?.id) {
+    if (typeof ogFetchPendingRequests === 'function') {
+     ogFetchPendingRequests().then(() => {
+      if (typeof ogUpdateRequestsRow === 'function') ogUpdateRequestsRow();
+      if (document.getElementById('followRequestsView')?.classList.contains('active')) ogRenderFollowRequests();
+     });
+    }
+    if (typeof ogNotifyFollowRequest === 'function') ogNotifyFollowRequest(payload.new);
+   }
+  })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'follow_requests' }, payload => {
+   if (payload.new?.requester_id === currentUser?.id && payload.new?.status === 'accepted') {
+    cachedFollowingIds = null;
+    ogCache.remove('following_ids');
+    cachedFeedPosts = null;
+    ogCache.remove('feed_posts');
+    if (typeof ogNotifyRequestAccepted === 'function') ogNotifyRequestAccepted(payload.new);
    }
   })
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes' }, payload => {
    if (payload.new?.user_id !== currentUser?.id) {
     invalidateActivityCacheAndRefreshIfVisible();
+    if (typeof ogNotifyFromRealtime === 'function') ogNotifyFromRealtime('like', payload.new);
    }
   })
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, payload => {
    if (payload.new?.user_id !== currentUser?.id) {
     invalidateActivityCacheAndRefreshIfVisible();
+    if (typeof ogNotifyFromRealtime === 'function') ogNotifyFromRealtime('comment', payload.new);
    }
   })
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories' }, () => {
@@ -136,6 +151,7 @@ function setupRealtimeNotifications() {
    if (!newMsg || newMsg.sender_id === currentUser?.id) return;
 
    document.getElementById('navUnreadDot')?.classList.add('active');
+   if (typeof ogNotifyIncomingMessage === 'function') ogNotifyIncomingMessage(newMsg);
    cachedConversationsList = null;
    ogCache.remove('conversations');
    prefetchedConversationIds.delete(newMsg.conversation_id);

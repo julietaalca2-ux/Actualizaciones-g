@@ -1,0 +1,65 @@
+/* Hoja "Enviar Loor" + tarjeta del Loor dentro del chat */
+.loor-share-backdrop {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(0,0,0,0.5);
+  display: none; align-items: flex-end; justify-content: center;
+}
+.loor-share-backdrop.open { display: flex; }
+.loor-share-sheet {
+  width: 100%; max-width: 470px; max-height: 82vh;
+  background: var(--bg-main); color: var(--text-primary);
+  border-radius: 20px 20px 0 0;
+  padding: 8px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.loor-share-handle { width: 38px; height: 4px; border-radius: 4px; background: var(--border-light); align-self: center; margin: 4px 0; }
+.loor-share-head { display: flex; align-items: center; justify-content: space-between; }
+.loor-share-head strong { font-size: 16px; }
+.loor-share-more { background: none; border: 0; color: var(--accent-blue); font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 2px; }
+.loor-share-search, .loor-share-text {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--border-light);
+  background: var(--bg-muted); color: var(--text-primary);
+  border-radius: 12px; padding: 10px 12px; font-size: 14px; outline: none;
+}
+.loor-share-list { overflow-y: auto; min-height: 120px; flex: 1; -webkit-overflow-scrolling: touch; }
+.loor-share-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 24px 8px; }
+.loor-share-row { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-radius: 12px; cursor: pointer; }
+.loor-share-row:active { background: var(--bg-muted); }
+.loor-share-avatar { width: 44px; height: 44px; flex-shrink: 0; }
+.loor-share-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.loor-share-info strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.loor-share-info small { color: var(--text-muted); font-size: 12px; }
+.loor-share-check {
+  width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-light);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; color: transparent; flex-shrink: 0;
+}
+.loor-share-row.selected .loor-share-check { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+.loor-share-compose { display: flex; gap: 8px; align-items: center; }
+.loor-share-send {
+  background: var(--accent-blue); color: #fff; border: 0; border-radius: 12px;
+  padding: 10px 16px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.loor-share-send:disabled { opacity: 0.45; cursor: default; }
+.loor-share-status { margin: 0; min-height: 0; font-size: 12px; color: #d33; text-align: center; }
+.loor-share-status:empty { display: none; }
+
+/* Tarjeta del Loor dentro de la burbuja del chat */
+.chat-loor-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 190px; }
+.chat-loor-text { padding: 4px 8px 0; font-size: 14px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
+.chat-loor-card {
+  display: block; width: 100%; padding: 0; border: 0; text-align: left; cursor: pointer;
+  border-radius: 14px; overflow: hidden; background: #000; color: #fff; font: inherit;
+}
+.chat-loor-media { position: relative; width: 100%; aspect-ratio: 9 / 14; max-height: 300px; background: linear-gradient(160deg, #1f2937, #000); }
+.chat-loor-media img, .chat-loor-media video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chat-loor-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.chat-loor-play svg { width: 22px; height: 22px; margin-left: 2px; }
+.chat-loor-meta { padding: 8px 10px 9px; display: flex; flex-direction: column; gap: 2px; background: rgba(0,0,0,0.85); }
+.chat-loor-meta strong { font-size: 13px; }
+.chat-loor-meta span { font-size: 12px; opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.chat-bubble.is-sending .chat-loor-card { opacity: 0.6; }

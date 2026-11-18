@@ -56,3 +56,18 @@ header {
 .icon:active { opacity: 0.6; transform: scale(0.92); }
 .icon svg { width: 22px; height: 22px; }
 
+
+/* Nombre de usuario centrado en el header del perfil (con el verificado al lado) */
+.header-username {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

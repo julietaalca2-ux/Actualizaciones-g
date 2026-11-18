@@ -33,36 +33,43 @@ function initLoors() {
   initLoorsSoundUI();
 }
 
-// Botón de sonido (preferencia por sesión) y aviso cuando el navegador exige un toque para activar el audio
+// Sonido: ya no hay botón fijo arriba. Al pausar un Loor, el botón de sonido aparece al lado del de reanudar (en cada tarjeta).
+let loorsSoundUIReady = false;
+let loorsSoundState = { on: true, needTap: false };
+
+function applyLoorsSoundBtn(btn) {
+  if (!btn) return;
+  btn.classList.toggle('is-off', !loorsSoundState.on);
+  btn.classList.toggle('needs-tap', !!loorsSoundState.needTap);
+  btn.setAttribute('aria-label', loorsSoundState.on ? 'Silenciar' : 'Activar sonido');
+}
+
 function initLoorsSoundUI() {
   const section = document.getElementById('loors-section');
-  if (!section || document.getElementById('loors-sound-btn')) return;
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id = 'loors-sound-btn';
-  btn.className = 'loors-sound-btn';
-  btn.innerHTML =
-    '<svg class="ico-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>' +
-    '<svg class="ico-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+  if (!section || loorsSoundUIReady) return;
+  loorsSoundUIReady = true;
+
   const hint = document.createElement('div');
   hint.id = 'loors-sound-hint';
   hint.className = 'loors-sound-hint';
   hint.textContent = 'Toca para activar el sonido';
-  section.appendChild(btn);
   section.appendChild(hint);
+  hint.addEventListener('click', () => LoorsEngine.sound.unlock());
 
-  btn.addEventListener('click', (e) => {
+  // Un solo manejador para los botones de sonido de todas las tarjetas
+  section.addEventListener('click', (e) => {
+    const btn = e.target.closest('.loor-sound-btn');
+    if (!btn) return;
     e.stopPropagation();
     const snd = LoorsEngine.sound;
     if (snd.needsTap()) snd.unlock();   // bloqueado por el navegador: este toque lo activa
     else snd.toggle();                  // activar / silenciar (se recuerda en la sesión)
   });
-  hint.addEventListener('click', () => LoorsEngine.sound.unlock());
+
   LoorsEngine.sound.onChange((st) => {
-    btn.classList.toggle('is-off', !st.on);
-    btn.classList.toggle('needs-tap', !!st.needTap);
+    loorsSoundState = { on: !!st.on, needTap: !!st.needTap };
+    section.querySelectorAll('.loor-sound-btn').forEach(applyLoorsSoundBtn);
     hint.classList.toggle('show', !!st.needTap);
-    btn.setAttribute('aria-label', st.on ? 'Silenciar' : 'Activar sonido');
   });
   // Cualquier toque real en Loors desbloquea el audio de Safari para los siguientes videos
   section.addEventListener('touchend', () => LoorsEngine.sound.prime(), { passive: true });
@@ -298,7 +305,10 @@ async function renderLoorsBatch(loors, container) {
 
     card.innerHTML = `
       <video class="loor-video" data-src="${escapeLoorHtml(loor.video_url)}" ${loor.thumbnail_url ? `data-poster="${escapeLoorHtml(loor.thumbnail_url)}"` : ''} playsinline webkit-playsinline loop preload="none" disablepictureinpicture disableremoteplayback ${loor.audio_url ? 'muted' : ''}></video>
-      <div class="loor-pause-indicator">❚❚</div>
+      <div class="loor-center-controls">
+        <div class="loor-pause-indicator" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></div>
+        <button type="button" class="loor-sound-btn" aria-label="Sonido"><svg class="ico-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg><svg class="ico-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg></button>
+      </div>
 
       <div class="loor-overlay-wrapper">
         <div class="loor-actions-bar">
@@ -323,7 +333,7 @@ async function renderLoorsBatch(loors, container) {
             <span class="loor-action-count">${isSaved ? 'Guardado' : 'Guardar'}</span>
           </button>
 
-          <button class="loor-action-btn btn-share" data-id="${loor.id}" data-desc="${escapeLoorHtml(loor.description)}" aria-label="Compartir">
+          <button class="loor-action-btn btn-share" data-id="${loor.id}" data-desc="${escapeLoorHtml(loor.description)}" data-thumb="${escapeLoorHtml(loor.thumbnail_url || '')}" data-video="${escapeLoorHtml(loor.video_url || '')}" data-username="${escapeLoorHtml(creator.username)}" aria-label="Compartir">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
               <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
@@ -365,6 +375,8 @@ async function renderLoorsBatch(loors, container) {
         </div>
       </div>
     `;
+
+    applyLoorsSoundBtn(card.querySelector('.loor-sound-btn'));
 
     // Si el primer video ya venía descargándose (warmFirst), la tarjeta lo adopta
     LoorsEngine.adopt(card, loor.id);
@@ -477,21 +489,17 @@ function bindLoorsUIEvents() {
       return;
     }
 
-    // COMPARTIR
+    // COMPARTIR: hoja para enviar el Loor por mensaje (con texto opcional)
     const shareBtn = e.target.closest('.btn-share');
     if (shareBtn) {
-      const shareData = {
-        title: 'Mirá este Loor en ÖG',
-        text: shareBtn.dataset.desc || 'Video en ÖG LOORS',
-        url: window.location.origin + '?loor=' + shareBtn.dataset.id
-      };
-      if (navigator.share) {
-        try { await navigator.share(shareData); } catch (_) {}
-      } else {
-        await navigator.clipboard.writeText(shareData.url);
-        if (typeof showToast === 'function') showToast('Enlace copiado');
-        else alert('Enlace del Loor copiado al portapapeles');
-      }
+      if (!requireLoorAuth()) return;
+      openLoorShareSheet({
+        id: shareBtn.dataset.id,
+        desc: shareBtn.dataset.desc || '',
+        thumb: shareBtn.dataset.thumb || '',
+        video: shareBtn.dataset.video || '',
+        username: shareBtn.dataset.username || ''
+      });
       return;
     }
 
@@ -507,7 +515,9 @@ function bindLoorsUIEvents() {
       } else {
         followBtn.classList.add('following');
         followBtn.textContent = 'Siguiendo';
-        await db.from('follows').insert({ follower_id: currentUser.id, following_id: creatorId });
+        const res = await ogRequestFollow(creatorId);
+        if (res === 'requested') { followBtn.classList.remove('following'); followBtn.textContent = 'Solicitado'; }
+        else if (res === 'error') { followBtn.classList.remove('following'); followBtn.textContent = 'Seguir'; }
       }
     }
   });

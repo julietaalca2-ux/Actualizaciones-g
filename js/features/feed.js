@@ -10,7 +10,9 @@
    prependSinglePostToFeed, buildPostDOMElement, toggleLike, loadPostLikes,
    loadPostComments, quickComment, handlePostImageSelect, removePostImage, publish,
    openPostDetail, closePostDetailModal, getSavedPostIds, toggleSavePost,
-   fetchAndRenderSavedGrid, loadSavedPostsGrid, loadSavedPostsProfileGrid */
+   fetchAndRenderSavedGrid, loadSavedPostsGrid, loadSavedPostsProfileGrid,
+   choosePostAudio, setPostAudio, clearPostAudio, buildPostMusicNode
+   (la música de las publicaciones usa la biblioteca de audio-library.js) */
 
 async function loadInitialPosts() {
  feedPage = 0;
@@ -184,7 +186,7 @@ function renderCommentsListToContainer(comments, container) {
   div.className = 'comment-item';
   const userSpan = document.createElement('span');
   userSpan.className = 'comment-user';
-  userSpan.textContent = profile.display_name || profile.username;
+  userSpan.textContent = profile.username || profile.display_name;
   userSpan.setAttribute('data-verify-user', c.user_id);
   const textSpan = document.createElement('span');
   textSpan.className = 'comment-text';
@@ -219,7 +221,7 @@ function buildPostDOMElement(post, preloadedMeta = null) {
 
  const name = document.createElement('div');
  name.className = 'username';
- name.textContent = profile.display_name || profile.username || 'Usuario';
+ name.textContent = profile.username || profile.display_name || 'Usuario';
  name.setAttribute('data-verify-user', post.user_id);
 
  const time = document.createElement('div');
@@ -240,10 +242,13 @@ function buildPostDOMElement(post, preloadedMeta = null) {
   article.append(img);
  }
 
+ const musicNode = buildPostMusicNode(post);
+ if (musicNode) article.append(musicNode);
+
  if (post.content) {
   const content = document.createElement('p');
   content.className = 'posttext';
-  content.style.marginTop = post.image_url ? '12px' : '0';
+  content.style.marginTop = (post.image_url || musicNode) ? '12px' : '0';
   content.textContent = post.content;
   article.append(content);
  }
@@ -399,18 +404,168 @@ async function publish() {
   }
  }
 
- await db.from('posts').insert({ user_id: currentUser.id, content: text, image_url: imageUrl });
+ const newPost = { user_id: currentUser.id, content: text, image_url: imageUrl };
+ // La música solo se envía si se eligió una (así las publicaciones sin música no dependen de las columnas nuevas)
+ if (postDraftAudio) {
+  newPost.audio_url = postDraftAudio.url;
+  newPost.audio_title = postDraftAudio.title;
+  newPost.audio_link = postDraftAudio.link || null;
+ }
+
+ const { error: insertError } = await db.from('posts').insert(newPost);
 
  isPublishing = false;
  document.getElementById('publishBtn').disabled = false;
+
+ if (insertError) {
+  console.error('Error al publicar:', insertError);
+  const missingCols = /audio_(url|title|link)/i.test(insertError.message || '');
+  return status('publishStatus', missingCols
+   ? 'Falta ejecutar el SQL de música en Supabase (supabase/01_musica_posts_y_push.sql).'
+   : 'No se pudo publicar: ' + insertError.message);
+ }
+
  document.getElementById('newpost').value = '';
  removePostImage();
+ clearPostAudio();
  status('publishStatus', '¡Publicado con éxito!');
+ ogPlaySound('publish');
  setTimeout(() => status('publishStatus', ''), 2000);
  cachedFeedPosts = null;
  ogCache.remove('feed_posts');
  showTab('feed');
  await loadInitialPosts();
+}
+
+/* ---------- Música en publicaciones ---------- */
+
+let postDraftAudio = null;   // { title, url, link } elegido en la biblioteca
+let postMusicEl = null;      // único <audio> de publicaciones (evita sonar dos a la vez)
+let postMusicBtn = null;
+let postMusicObserver = null;
+
+function choosePostAudio() {
+ openAudioPicker('post');
+}
+
+function setPostAudio(audio) {
+ postDraftAudio = audio;
+ renderPostDraftAudio();
+}
+
+function clearPostAudio() {
+ postDraftAudio = null;
+ renderPostDraftAudio();
+}
+
+function renderPostDraftAudio() {
+ const box = document.getElementById('post-audio-selected');
+ const name = document.getElementById('post-audio-selected-name');
+ const btn = document.getElementById('post-audio-choose-btn');
+ if (!box || !name) return;
+ if (postDraftAudio) {
+  name.textContent = postDraftAudio.title;
+  box.style.display = 'flex';
+  if (btn) btn.textContent = '🎵 Cambiar música';
+ } else {
+  name.textContent = '';
+  box.style.display = 'none';
+  if (btn) btn.textContent = '🎵 Añadir música';
+ }
+}
+
+const POST_MUSIC_PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+const POST_MUSIC_PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+
+function stopPostMusic() {
+ const el = postMusicEl;
+ const btn = postMusicBtn;
+ postMusicEl = null;
+ postMusicBtn = null;
+ if (el) {
+  el.pause();
+  el.removeAttribute('src');
+  el.load();
+ }
+ if (btn) {
+  btn.innerHTML = POST_MUSIC_PLAY_SVG;
+  btn.closest('.post-music')?.classList.remove('playing');
+ }
+}
+
+function togglePostMusic(url, btn) {
+ if (postMusicEl && postMusicBtn === btn) {
+  if (postMusicEl.paused) postMusicEl.play().catch(() => stopPostMusic());
+  else stopPostMusic();
+  return;
+ }
+ stopPostMusic();
+
+ const el = new Audio(url);
+ el.loop = true;
+ el.preload = 'auto';
+ postMusicEl = el;
+ postMusicBtn = btn;
+ btn.innerHTML = POST_MUSIC_PAUSE_SVG;
+ btn.closest('.post-music')?.classList.add('playing');
+ el.addEventListener('error', () => { if (postMusicEl === el) stopPostMusic(); });
+ el.play().catch(() => stopPostMusic());
+}
+
+// Pausa la música cuando la publicación sale de la pantalla
+function watchPostMusic(node) {
+ if (!('IntersectionObserver' in window)) return;
+ if (!postMusicObserver) {
+  postMusicObserver = new IntersectionObserver(entries => {
+   entries.forEach(entry => {
+    if (!entry.isIntersecting && postMusicBtn && entry.target.contains(postMusicBtn)) stopPostMusic();
+   });
+  }, { threshold: 0.15 });
+ }
+ postMusicObserver.observe(node);
+}
+
+document.addEventListener('visibilitychange', () => {
+ if (document.visibilityState === 'hidden') stopPostMusic();
+});
+
+function buildPostMusicNode(post) {
+ if (!post || !post.audio_url) return null;
+
+ const wrap = document.createElement('div');
+ wrap.className = 'post-music';
+
+ const btn = document.createElement('button');
+ btn.type = 'button';
+ btn.className = 'post-music-btn';
+ btn.setAttribute('aria-label', 'Reproducir música');
+ btn.innerHTML = POST_MUSIC_PLAY_SVG;
+ btn.onclick = () => togglePostMusic(post.audio_url, btn);
+
+ const info = document.createElement('div');
+ info.className = 'post-music-info';
+ const title = document.createElement('span');
+ title.className = 'post-music-title';
+ title.textContent = post.audio_title || 'Música';
+ info.append(title);
+
+ if (post.audio_link) {
+  const link = document.createElement('a');
+  link.className = 'post-music-credit';
+  link.href = post.audio_link;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Fuente';
+  info.append(link);
+ }
+
+ const bars = document.createElement('div');
+ bars.className = 'post-music-bars';
+ bars.innerHTML = '<i></i><i></i><i></i>';
+
+ wrap.append(btn, info, bars);
+ watchPostMusic(wrap);
+ return wrap;
 }
 
 async function openPostDetail(post) {
@@ -428,7 +583,7 @@ async function openPostDetail(post) {
  head.className = 'posthead';
  head.append(createAvatarNode(profile, false));
  const info = document.createElement('div');
- info.innerHTML = `<div class="username" data-verify-user="${post.user_id}">${profile.display_name || profile.username}</div><div class="time">${formatDate(post.created_at)}</div>`;
+ info.innerHTML = `<div class="username" data-verify-user="${post.user_id}">${profile.username || profile.display_name}</div><div class="time">${formatDate(post.created_at)}</div>`;
  head.append(info);
  article.append(head);
 
@@ -439,6 +594,8 @@ async function openPostDetail(post) {
   img.decoding = 'async';
   article.append(img);
  }
+ const detailMusic = buildPostMusicNode(post);
+ if (detailMusic) article.append(detailMusic);
  if (post.content) {
   const content = document.createElement('p');
   content.className = 'posttext';
@@ -480,6 +637,7 @@ async function openPostDetail(post) {
 }
 
 function closePostDetailModal() {
+ stopPostMusic();
  document.getElementById('postDetailModal').classList.remove('active');
 }
 

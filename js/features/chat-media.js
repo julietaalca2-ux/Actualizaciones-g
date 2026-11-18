@@ -48,6 +48,8 @@ function buildChatPayloadNode(payload, msg, isMine) {
   return wrap;
  }
 
+if (payload.t === 'loor') return buildChatLoorNode(payload);
+
  if (!isSafeChatMediaUrl(payload.u)) return null;
 
  if (payload.t === 'image') {
@@ -99,6 +101,66 @@ function buildChatPayloadNode(payload, msg, isMine) {
   return a;
  }
  return null;
+}
+
+/* ---------- Loor compartido: texto opcional + tarjeta que abre el video en Loors ---------- */
+function buildChatLoorNode(payload) {
+ const wrap = document.createElement('div');
+ wrap.className = 'chat-loor-wrap';
+
+ if (payload.x) {
+  const msg = document.createElement('div');
+  msg.className = 'chat-loor-text';
+  msg.textContent = String(payload.x);
+  wrap.append(msg);
+ }
+
+ const card = document.createElement('button');
+ card.type = 'button';
+ card.className = 'chat-loor-card';
+ card.setAttribute('aria-label', 'Abrir Loor');
+
+ const media = document.createElement('div');
+ media.className = 'chat-loor-media';
+ if (isSafeChatMediaUrl(payload.th)) {
+  const img = document.createElement('img');
+  img.src = payload.th;
+  img.alt = '';
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  media.append(img);
+ } else if (isSafeChatMediaUrl(payload.v)) {
+  const vid = document.createElement('video');
+  vid.src = payload.v + '#t=0.1';
+  vid.muted = true;
+  vid.playsInline = true;
+  vid.setAttribute('playsinline', '');
+  vid.preload = 'metadata';
+  media.append(vid);
+ }
+ const play = document.createElement('span');
+ play.className = 'chat-loor-play';
+ play.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
+ media.append(play);
+
+ const meta = document.createElement('div');
+ meta.className = 'chat-loor-meta';
+ const who = document.createElement('strong');
+ who.textContent = payload.un ? '@' + payload.un : 'Loor';
+ meta.append(who);
+ if (payload.d) {
+  const d = document.createElement('span');
+  d.textContent = String(payload.d);
+  meta.append(d);
+ }
+
+ card.append(media, meta);
+ card.addEventListener('click', e => {
+  e.stopPropagation();
+  if (typeof openLoorFromChat === 'function') openLoorFromChat(payload.id);
+ });
+ wrap.append(card);
+ return wrap;
 }
 
 /* ---------- Visor de foto a pantalla completa ---------- */

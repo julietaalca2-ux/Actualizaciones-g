@@ -29,10 +29,13 @@ function updateProfileUI() {
 
  document.getElementById('profile-actions').style.display = 'flex';
  document.getElementById('myname').textContent = myProfile?.display_name || myProfile?.username || 'Mi perfil';
- markVerifyUser(document.getElementById('myname'), myProfile?.id || currentUser?.id);
+ const headerUsernameEl = document.getElementById('headerUsername');
+ if (headerUsernameEl) {
+  headerUsernameEl.textContent = myProfile?.username || '';
+  markVerifyUser(headerUsernameEl, myProfile?.id || currentUser?.id);
+ }
  document.getElementById('mypronouns').textContent = myProfile?.pronouns ? `· ${myProfile.pronouns}` : '';
- document.getElementById('myusername').textContent = '@' + (myProfile?.username || '');
- document.getElementById('mybio').textContent = myProfile?.bio || '';
+  document.getElementById('mybio').textContent = myProfile?.bio || '';
 
  const websiteContainer = document.getElementById('myWebsiteContainer');
 
@@ -329,12 +332,12 @@ function shareProfileLink() {
 
 function renderPublicProfileHeader(profile) {
  viewedProfile = profile;
- document.getElementById('publicname').textContent = profile.display_name || profile.username;
- markVerifyUser(document.getElementById('publicname'), profile.id);
- document.getElementById('publicpronouns').textContent = profile.pronouns ? `· ${profile.pronouns}` : '';
- document.getElementById('publicheadername').textContent = profile.username;
- document.getElementById('publicusername').textContent = '@' + profile.username;
- document.getElementById('publicbio').textContent = profile.bio || '';
+ document.getElementById('publicname').textContent = profile.username || profile.display_name;
+  document.getElementById('publicpronouns').textContent = profile.pronouns ? `· ${profile.pronouns}` : '';
+ const pubHeaderEl = document.getElementById('publicheadername');
+ pubHeaderEl.textContent = profile.username;
+ markVerifyUser(pubHeaderEl, profile.id);
+  document.getElementById('publicbio').textContent = profile.bio || '';
 
  const websiteContainer = document.getElementById('publicWebsiteContainer');
 
@@ -392,6 +395,7 @@ async function openPublicProfile(userId) {
   loadPublicCounts(userId),
   loadHighlights(userId, 'publicHighlightsScrollContainer')
  ]);
+ await ogApplyPrivateGate(userId);
 }
 
 async function loadPublicCounts(userId) {
@@ -416,10 +420,11 @@ async function checkFollowStatus(userId) {
   .maybeSingle();
 
  isFollowing = !!data;
+ ogFollowRequested = isFollowing ? false : await ogHasPendingRequest(userId);
 
  const btn = document.getElementById('publicfollow');
- btn.textContent = isFollowing ? 'Siguiendo' : 'Seguir';
- btn.classList.toggle('primary-action', !isFollowing);
+ btn.textContent = isFollowing ? 'Siguiendo' : (ogFollowRequested ? 'Solicitado' : 'Seguir');
+ btn.classList.toggle('primary-action', !isFollowing && !ogFollowRequested);
 }
 
 async function toggleFollow() {
@@ -427,25 +432,31 @@ async function toggleFollow() {
 
  const btn = document.getElementById('publicfollow');
 
- if (isFollowing) {
-  await db.from('follows').delete()
-   .eq('follower_id', currentUser.id)
-   .eq('following_id', viewedProfile.id);
+ if (isFollowing || ogFollowRequested) {
+  // Dejar de seguir, o cancelar una solicitud pendiente
+  if (isFollowing) {
+   await db.from('follows').delete()
+    .eq('follower_id', currentUser.id)
+    .eq('following_id', viewedProfile.id);
+  }
+  await ogCancelFollowRequest(viewedProfile.id);
 
   isFollowing = false;
+  ogFollowRequested = false;
   btn.textContent = 'Seguir';
   btn.classList.add('primary-action');
 
  } else {
-  await db.from('follows').insert({
-   follower_id: currentUser.id,
-   following_id: viewedProfile.id
-  });
+  // En cuentas privadas esto crea una solicitud en vez de seguir directo
+  const result = await ogRequestFollow(viewedProfile.id);
+  if (result === 'error') return;
 
-  isFollowing = true;
-  btn.textContent = 'Siguiendo';
+  isFollowing = result === 'following';
+  ogFollowRequested = result === 'requested';
+  btn.textContent = isFollowing ? 'Siguiendo' : 'Solicitado';
   btn.classList.remove('primary-action');
  }
+ ogApplyPrivateGate(viewedProfile.id);
 
  cachedFollowingIds = null;
  ogCache.remove('following_ids');
@@ -540,7 +551,7 @@ async function renderUsersInFollowModal(userIds) {
 
   const info = document.createElement('div');
   info.className = 'public-user-info';
-  info.innerHTML = `<strong data-verify-user="${profile.id}">${profile.display_name || profile.username}</strong><small>@${profile.username}</small>`;
+  info.innerHTML = `<strong data-verify-user="${profile.id}">${profile.username || profile.display_name}</strong>`;
 
   item.append(info);
 

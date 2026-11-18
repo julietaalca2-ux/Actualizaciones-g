@@ -190,6 +190,7 @@ async function loadAccount(user) {
 
   setupRealtimeNotifications();
   setupPresenceChannel();
+  if (typeof ogInitNotifications === 'function') ogInitNotifications();
  } finally {
   loadingAccountUserId = null;
  }

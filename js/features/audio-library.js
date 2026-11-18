@@ -12,7 +12,7 @@ const JAMENDO_TRACKS_URL = 'https://api.jamendo.com/v3.0/tracks/';
 const OWN_AUDIO_MAX_BYTES = 20 * 1024 * 1024; // 20 MB, igual que el bucket og_audios
 
 let selectedLoorAudio = null;
-let audioPickerTarget = 'loor'; // 'loor' = audio de un Loor, 'note' = canción de una nota
+let audioPickerTarget = 'loor'; // 'loor' = audio de un Loor, 'note' = canción de una nota, 'post' = música de una publicación
 let audioPreviewEl = null;
 let audioPreviewBtn = null;
 let audioPickerBound = false;
@@ -51,6 +51,9 @@ function selectLoorAudio(audio) {
   if (audioPickerTarget === 'note') {
     // La canción es para una nota (notes.js)
     if (typeof setNoteAudio === 'function') setNoteAudio(audio);
+  } else if (audioPickerTarget === 'post') {
+    // La música es para una publicación (feed.js)
+    if (typeof setPostAudio === 'function') setPostAudio(audio);
   } else {
     selectedLoorAudio = audio;
     renderSelectedLoorAudio();
@@ -62,7 +65,7 @@ function selectLoorAudio(audio) {
 
 function openAudioPicker(target) {
   if (!requireLoorAuth()) return;
-  audioPickerTarget = target === 'note' ? 'note' : 'loor';
+  audioPickerTarget = target === 'note' ? 'note' : (target === 'post' ? 'post' : 'loor');
   bindAudioPicker();
   document.getElementById('audio-picker-modal').classList.add('open');
   switchAudioTab('own');
@@ -213,6 +216,15 @@ async function removeOwnAudio(audio) {
   loadOwnAudios();
 }
 
+/* El bucket solo acepta audio/*. Un .mp4 / .mov (video) se guarda como audio/mp4:
+   el navegador reproduce su pista de sonido igual. */
+function audioUploadMime(file, ext) {
+  const t = (file.type || '').toLowerCase();
+  if (t.startsWith('audio/')) return t;
+  const byExt = { mp3: 'audio/mpeg', m4a: 'audio/mp4', mp4: 'audio/mp4', mov: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', webm: 'audio/webm' };
+  return byExt[ext] || 'audio/mp4';
+}
+
 async function handleUploadOwnAudio(e) {
   e.preventDefault();
   if (!requireLoorAuth()) return;
@@ -235,17 +247,30 @@ async function handleUploadOwnAudio(e) {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Subiendo audio...';
 
+  let usedMime = '';
   try {
     const ext = (file.name.split('.').pop() || 'm4a').toLowerCase().replace(/[^a-z0-9]/g, '') || 'm4a';
     const path = `${currentUser.id}/${Date.now()}.${ext}`;
 
-    const { error: uploadError } = await db.storage
-      .from('og_audios')
-      .upload(path, file, {
+    // Se sube como bytes (ArrayBuffer): así el tipo lo decide SOLO contentType (audio/...),
+    // y no el tipo del archivo original (video/mp4), que Supabase usaría si se enviara el File directo.
+    const bytes = await file.arrayBuffer();
+    const baseMime = audioUploadMime(file, ext);
+    const mimeTries = [baseMime, 'audio/x-m4a', 'audio/mpeg'].filter((m, i, arr) => arr.indexOf(m) === i);
+
+    let uploadError = null;
+    usedMime = baseMime;
+    for (const mime of mimeTries) {
+      usedMime = mime;
+      const res = await db.storage.from('og_audios').upload(path, bytes, {
         cacheControl: '3600',
         upsert: false,
-        contentType: file.type || 'audio/mp4'
+        contentType: mime
       });
+      uploadError = res.error;
+      // Solo se reintenta con otro tipo si el error es de tipo de archivo no permitido
+      if (!uploadError || !/mime/i.test(uploadError.message || '')) break;
+    }
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = db.storage.from('og_audios').getPublicUrl(path);
@@ -261,7 +286,7 @@ async function handleUploadOwnAudio(e) {
     await loadOwnAudios();
   } catch (err) {
     console.error('Error subiendo audio:', err);
-    alert('Error al subir el audio: ' + err.message);
+    alert('Error al subir el audio (' + (usedMime || 'sin tipo') + '): ' + err.message);
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Guardar audio';

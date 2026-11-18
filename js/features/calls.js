@@ -114,7 +114,7 @@ function showCallOverlay() {
  const c = call;
  if (!c) return;
  const overlay = document.getElementById('callOverlay');
- document.getElementById('callPeerName').textContent = c.peerProfile?.display_name || c.peerProfile?.username || 'Llamada';
+ document.getElementById('callPeerName').textContent = c.peerProfile?.username || c.peerProfile?.display_name || 'Llamada';
  setAvatarContent(document.getElementById('callPeerAvatar'), c.peerProfile?.avatar_url, '👤');
  overlay.classList.toggle('audio-only', !c.video);
  overlay.classList.remove('connected');
@@ -293,6 +293,16 @@ async function handleCallSignal(msg) {
    video: !!msg.video, convId: msg.convId || null, state: 'incoming'
   });
   showIncomingCall();
+  if (typeof ogNotify === 'function') {
+   ogNotify({
+    type: 'call',
+    title: profile?.username || profile?.display_name || 'Alguien',
+    body: msg.video ? 'Videollamada entrante…' : 'Llamada entrante…',
+    icon: profile?.avatar_url || undefined,
+    tag: 'incoming-call',
+    data: { sender_id: msg.from }
+   });
+  }
   // Si quien llama se rinde o no contestamos, el aviso se cierra solo
   call.ringTimeout = setTimeout(() => { if (call && call.state === 'incoming') finishCall('missed-local'); }, CALL_RING_TIMEOUT_MS + 5000);
   return;
@@ -348,7 +358,7 @@ function showIncomingCall() {
  const c = call;
  if (!c) return;
  setAvatarContent(document.getElementById('incomingCallAvatar'), c.peerProfile?.avatar_url, '👤');
- document.getElementById('incomingCallName').textContent = c.peerProfile?.display_name || c.peerProfile?.username || 'Alguien';
+ document.getElementById('incomingCallName').textContent = c.peerProfile?.username || c.peerProfile?.display_name || 'Alguien';
  document.getElementById('incomingCallKind').textContent = c.video ? 'Videollamada entrante…' : 'Llamada entrante…';
  document.getElementById('incomingCallOverlay').classList.add('active');
  startRingtone();

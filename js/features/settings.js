@@ -63,7 +63,8 @@ const MENU_PREFS_CONFIG = [
  { key: 'notifLikes', id: 'notifLikesToggle', defaultVal: true },
  { key: 'notifComments', id: 'notifCommentsToggle', defaultVal: true },
  { key: 'notifFollows', id: 'notifFollowsToggle', defaultVal: true },
- { key: 'notifDm', id: 'notifDmToggle', defaultVal: true }
+ { key: 'notifDm', id: 'notifDmToggle', defaultVal: true },
+ { key: 'soundEffects', id: 'soundEffectsToggle', defaultVal: true }
 ];
 
 function saveMenuPreferences() {
@@ -74,9 +75,12 @@ function saveMenuPreferences() {
  });
  localStorage.setItem('og_user_settings_' + (currentUser?.id || 'guest'), JSON.stringify(prefs));
  setupPresenceChannel();
+ if (typeof ogSyncPushPrefs === 'function') ogSyncPushPrefs();
+ if (typeof ogSyncPrivateAccount === 'function') ogSyncPrivateAccount();
 }
 
 function loadMenuPreferences() {
+ if (typeof ogLoadPrivateFromServer === 'function') ogLoadPrivateFromServer(); // la cuenta privada vive en el servidor
  try {
   const raw = localStorage.getItem('og_user_settings_' + (currentUser?.id || 'guest'));
   if (!raw) return;

@@ -37,6 +37,7 @@ function chatContentPreview(content) {
  if (p.t === 'image') return '📷 Foto';
  if (p.t === 'video') return '🎥 Video';
  if (p.t === 'audio') return '🎤 Mensaje de voz';
+ if (p.t === 'loor') return p.x ? '🎬 ' + p.x : '🎬 Loor';
  if (p.t === 'file') return '📎 ' + (p.n || 'Archivo');
  if (p.t === 'call') return p.v ? '📹 Videollamada' : '📞 Llamada';
  return 'Mensaje';
@@ -191,7 +192,7 @@ function renderConversationsDOM(conversationsList, container) {
   const nameRow = document.createElement('div');
   nameRow.className = 'dm-conv-name';
   const nameSpan = document.createElement('span');
-  nameSpan.textContent = item.profile.display_name || item.profile.username;
+  nameSpan.textContent = item.profile.username || item.profile.display_name;
   const timeSpan = document.createElement('span');
   timeSpan.className = 'dm-conv-time';
   timeSpan.textContent = item.time;
@@ -236,7 +237,7 @@ async function searchUsersForChat() {
    item.append(createAvatarNode(profile, false));
    const info = document.createElement('div');
    info.className = 'public-user-info';
-   info.innerHTML = `<strong>${profile.display_name || profile.username}</strong><small>@${profile.username}</small>`;
+   info.innerHTML = `<strong>${profile.username}</strong>`;
    item.append(info);
    item.onclick = () => openDirectChatWithUser(profile.id);
    fragment.append(item);
@@ -338,7 +339,7 @@ async function openChatRoom(conversationId, recipientProfile) {
  const bottomNavBar = document.getElementById('bottomNavBar');
  if (bottomNavBar) bottomNavBar.style.display = 'none';
 
- document.getElementById('chatRoomTitle').textContent = recipientProfile.display_name || recipientProfile.username;
+ document.getElementById('chatRoomTitle').textContent = recipientProfile.username || recipientProfile.display_name;
 
  const headerAvatar = document.getElementById('chatRoomHeaderAvatar');
  headerAvatar.replaceChildren();
@@ -356,7 +357,8 @@ async function openChatRoom(conversationId, recipientProfile) {
  if (onlineUsersMap[recipientProfile.id]) dot.classList.add('active');
  headerAvatar.append(dot);
 
- document.getElementById('chatRoomStatusSub').textContent = onlineUsersMap[recipientProfile.id] ? 'En línea' : 'Desconectado';
+ document.getElementById('chatRoomStatusSub').textContent = onlineUsersMap[recipientProfile.id] ? 'En línea' : ogFormatLastSeen(ogLastSeenCache[recipientProfile.id]);
+ if (!onlineUsersMap[recipientProfile.id]) ogRefreshChatStatus();
 
  const container = document.getElementById('chatMessagesContainer');
  const cachedMsgs = prefetchedMessagesByConv[conversationId] || ogCache.get(`chat_msgs_${conversationId}`, 1000 * 60 * 60 * 12);
@@ -694,6 +696,7 @@ async function deliverChatMessage(payload, node, tempId) {
 
  renderedMessageIds.delete(tempId);
  renderedMessageIds.add(inserted.id);
+ ogPlaySound('send');
  if (node) {
   node.classList.remove('is-sending', 'is-error');
   node.dataset.msgId = inserted.id;
@@ -747,12 +750,12 @@ function openChatDetailsPage() {
 
  const av = document.getElementById('chatDetailsAvatarContainer');
  setAvatarContent(av, activeRecipientProfile.avatar_url, '👤');
- document.getElementById('chatDetailsName').textContent = activeRecipientProfile.display_name || activeRecipientProfile.username;
+ document.getElementById('chatDetailsName').textContent = activeRecipientProfile.username || activeRecipientProfile.display_name;
  document.getElementById('chatDetailsUsername').textContent = '@' + activeRecipientProfile.username;
 
  const isOnline = onlineUsersMap[activeRecipientProfile.id];
  const statusEl = document.getElementById('chatDetailsActivityStatus');
- statusEl.textContent = isOnline ? 'En línea' : 'Desconectado';
+ statusEl.textContent = isOnline ? 'En línea' : ogFormatLastSeen(ogLastSeenCache[activeRecipientProfile.id]);
  statusEl.style.color = isOnline ? '#22c55e' : '#888888';
 }
 

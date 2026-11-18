@@ -8,7 +8,7 @@
 
 const PROFILE_SELECT_FIELDS = 'id, username, display_name, bio, avatar_url, pronouns, website, gender';
 const PROFILE_MINI_FIELDS = 'id, username, display_name, avatar_url';
-const POST_SELECT_FIELDS = 'id, user_id, content, image_url, views, created_at';
+const POST_SELECT_FIELDS = 'id, user_id, content, image_url, views, created_at, audio_url, audio_title, audio_link';
 const MAX_PROFILES_IN_CACHE = 250;
 
 function sanitizeProfileForCache(profile) {

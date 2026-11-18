@@ -10,3 +10,8 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   storage: window.localStorage
  }
 });
+
+/* Notificaciones push (aviso aunque la app esté cerrada).
+   Clave PÚBLICA VAPID: se genera una sola vez con  npx web-push generate-vapid-keys
+   (la privada va como secret en la Edge Function send-push, nunca aquí). */
+window.OG_VAPID_PUBLIC_KEY = 'BDI9nz6SLa9wU4UBATWFE1XP3dHsY_NHthnsq_nx1z1SzmMA_E_UHIGFaiCmvkguD_xgU0YwyH-g_mwvTedQRY0';

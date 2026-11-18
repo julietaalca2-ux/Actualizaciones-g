@@ -53,7 +53,10 @@
 <link rel="stylesheet" href="css/settings.css">
 <link rel="stylesheet" href="css/camera.css">
 <link rel="stylesheet" href="css/loors.css">
+<link rel="stylesheet" href="css/loors-share.css">
 <link rel="stylesheet" href="css/notes.css">
+<link rel="stylesheet" href="css/notifications.css">
+<link rel="stylesheet" href="css/activity.css">
 <link rel="stylesheet" href="css/verification.css">
 <link rel="stylesheet" href="css/style.css">
 <!-- ANIMACIONES Y MODO LIVIANO (capa aditiva) -->
@@ -124,6 +127,9 @@
 </div>
 <div class="header-center-slot" id="headerLogoSlot" style="display:flex;">
 <div class="logo">ÖG<span>.</span></div>
+</div>
+<div class="header-center-slot" id="headerUsernameSlot" style="display:none;">
+<span class="header-username" id="headerUsername"></span>
 </div>
 <div class="header-right-slot" id="header-default-icons">
 <button class="icon" onclick="openCameraModal()" aria-label="Cámara">
@@ -222,20 +228,27 @@ Tu historia
 <input type="file" id="postImageFileInput" class="hidden-file" accept="image/jpeg,image/png,image/webp" onchange="handlePostImageSelect(this)">
 <label class="muted" style="font-size:12px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;">Reflexión / Título</label>
 <textarea id="newpost" placeholder="Describe la luz, materialidad o contexto de este espacio..."></textarea>
+<div class="post-music-chooser">
+<button type="button" id="post-audio-choose-btn" class="loor-audio-choose-btn" onclick="choosePostAudio()">🎵 Añadir música</button>
+<div id="post-audio-selected" class="loor-audio-selected">
+<span id="post-audio-selected-name"></span>
+<button type="button" aria-label="Quitar música" onclick="clearPostAudio()">✕</button>
+</div>
+</div>
 <button class="primary" id="publishBtn" style="margin-top:16px" onclick="publish()">Publicar en el archivo</button>
 <p id="publishStatus" class="status"></p>
 </div>
 </div>
 <!-- ACTIVIDAD / NOTIFICACIONES -->
-<div id="notifications" class="section" style="padding: 18px;">
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-<h2 style="margin:0;font-size:20px;letter-spacing:-0.03em;">Actividad <span style="color:var(--accent-blue)">•</span></h2>
-<button class="icon" onclick="showTab('feed')" aria-label="Volver al feed">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+<div id="notifications" class="section">
+<div class="act-header">
+<button class="act-back" onclick="showTab('feed')" aria-label="Volver al feed">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
 </button>
+<h2>Notificaciones</h2>
 </div>
 <div id="activitylist">
-<p class="muted">Sincronizando apreciaciones y reflexiones...</p>
+<div class="activity-empty">Cargando…</div>
 </div>
 </div>
 <!-- MI PERFIL -->
@@ -267,7 +280,6 @@ Tu historia
 <span id="myname">Mi perfil</span>
 <span id="mypronouns" class="profile-pronouns-tag"></span>
 </h2>
-<p class="profile-username-tag" id="myusername">@usuario</p>
 <p class="profile-bio-text" id="mybio">Bienvenido a ÖG.</p>
 <div id="myWebsiteContainer" style="display:none;">
 <a href="#" id="myWebsiteLink" class="profile-website-link" target="_blank" rel="noopener noreferrer">
@@ -347,7 +359,6 @@ Tu historia
 <span id="publicname">Usuario</span>
 <span id="publicpronouns" class="profile-pronouns-tag"></span>
 </h2>
-<p class="profile-username-tag" id="publicusername">@usuario</p>
 <p class="profile-bio-text" id="publicbio"></p>
 <div id="publicWebsiteContainer" style="display:none;">
 <a href="#" id="publicWebsiteLink" class="profile-website-link" target="_blank" rel="noopener noreferrer">
@@ -691,14 +702,67 @@ Tu historia
 <strong style="font-size:16px;color:var(--text-primary);">Notificaciones</strong>
 </div>
 <div class="menu-section-content">
+<div class="settings-group">
+<h4 class="settings-group-title">En tu teléfono</h4>
+<div class="settings-row">
+<div class="settings-row-info">
+<p class="settings-row-title">Notificaciones del teléfono</p>
+<p id="notifPushStatus" class="og-notif-status"></p>
+</div>
+<label class="toggle-switch">
+<input type="checkbox" id="notifPushToggle" onchange="ogToggleSystemNotifications(this)">
+<span class="toggle-slider"></span>
+</label>
+</div>
+</div>
+<div class="settings-group">
+<h4 class="settings-group-title">Sonidos</h4>
+<div class="settings-row">
+<div class="settings-row-info">
+<p class="settings-row-title">Sonidos de la app</p>
+<p class="settings-row-desc">Al enviar mensajes, publicar y recibir notificaciones.</p>
+</div>
+<label class="toggle-switch">
+<input type="checkbox" id="soundEffectsToggle" checked onchange="saveMenuPreferences(); if (this.checked) ogPlaySound('notif')">
+<span class="toggle-slider"></span>
+</label>
+</div>
+</div>
 <div class="settings-group" style="border-bottom:none">
 <h4 class="settings-group-title">Alertas en tiempo real</h4>
+<div class="settings-row">
+<div class="settings-row-info">
+<p class="settings-row-title">Mensajes directos</p>
+</div>
+<label class="toggle-switch">
+<input type="checkbox" id="notifDmToggle" checked onchange="saveMenuPreferences()">
+<span class="toggle-slider"></span>
+</label>
+</div>
 <div class="settings-row">
 <div class="settings-row-info">
 <p class="settings-row-title">Apreciaciones en publicaciones</p>
 </div>
 <label class="toggle-switch">
 <input type="checkbox" id="notifLikesToggle" checked onchange="saveMenuPreferences()">
+<span class="toggle-slider"></span>
+</label>
+</div>
+<div class="settings-row">
+<div class="settings-row-info">
+<p class="settings-row-title">Comentarios</p>
+</div>
+<label class="toggle-switch">
+<input type="checkbox" id="notifCommentsToggle" checked onchange="saveMenuPreferences()">
+<span class="toggle-slider"></span>
+</label>
+</div>
+<div class="settings-row">
+<div class="settings-row-info">
+<p class="settings-row-title">Nuevos seguidores</p>
+</div>
+<label class="toggle-switch">
+<input type="checkbox" id="notifFollowsToggle" checked onchange="saveMenuPreferences()">
 <span class="toggle-slider"></span>
 </label>
 </div>
@@ -1004,6 +1068,23 @@ Subir
 </div>
 <div id="loors-feed-container" class="loors-feed-container"></div>
 </section>
+<!-- Loors: compartir por mensaje -->
+<div id="loor-share-backdrop" class="loor-share-backdrop" onclick="if(event.target===this)closeLoorShareSheet()">
+<div class="loor-share-sheet" role="dialog" aria-label="Enviar Loor">
+<div class="loor-share-handle"></div>
+<div class="loor-share-head">
+<strong>Enviar Loor</strong>
+<button type="button" class="loor-share-more" onclick="shareLoorExternally()">Más opciones</button>
+</div>
+<input id="loor-share-search" class="loor-share-search" type="search" placeholder="Buscar usuario…" autocomplete="off" oninput="onLoorShareSearch()">
+<div id="loor-share-list" class="loor-share-list"></div>
+<div class="loor-share-compose">
+<input id="loor-share-text" class="loor-share-text" type="text" maxlength="500" placeholder="Escribí un mensaje…" autocomplete="off">
+<button id="loor-share-send" type="button" class="loor-share-send" onclick="submitLoorShare()" disabled>Enviar</button>
+</div>
+<p id="loor-share-status" class="loor-share-status"></p>
+</div>
+</div>
 <!-- Loors: comentarios -->
 <div id="loors-comments-modal" class="loor-modal-backdrop" onclick="if(event.target===this)this.classList.remove('open')">
 <div class="loor-sheet">
@@ -1045,7 +1126,7 @@ Subir
 <div id="audio-picker-modal" class="loor-modal-backdrop audio-picker-backdrop" onclick="if(event.target===this)closeAudioPicker()">
 <div class="loor-sheet audio-picker-sheet">
 <div class="loor-sheet-header">
-<span>Elegir audio</span>
+<span id="audio-picker-title">Elegir audio</span>
 <button type="button" class="loor-close-modal" aria-label="Cerrar" onclick="closeAudioPicker()">✕</button>
 </div>
 <div class="audio-tabs">
@@ -1194,10 +1275,22 @@ Subir
 </button>
 </div>
 </div>
+<!-- SOLICITUDES DE SEGUIDORES -->
+<div id="followRequestsView" class="fr-view" role="dialog" aria-label="Solicitudes de seguidores">
+<div class="fr-header">
+<button class="act-back" onclick="ogCloseFollowRequests()" aria-label="Volver">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+</button>
+<h3>Solicitudes de seguidores</h3>
+</div>
+<div id="followRequestsList"></div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="(function(){var s=document.getElementById('appSplashScreen');if(s)s.innerHTML='<div style=&quot;text-align:center;font-family:sans-serif;padding:24px&quot;><p>No se pudo cargar la app. Revisa tu conexión.</p><button onclick=&quot;location.reload()&quot; style=&quot;padding:10px 18px;border-radius:999px;border:0;background:#111;color:#fff;font-weight:600&quot;>Reintentar</button></div>';})()"></script>
 <script src="js/config.js"></script>
 <script src="js/state.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/core/sounds.js"></script>
+<script src="js/core/last-seen.js"></script>
 <script src="js/core/performance.js"></script>
 <script src="js/core/pwa.js"></script>
 <script src="js/core/navigation.js"></script>
@@ -1212,13 +1305,16 @@ Subir
 <script src="js/features/explore.js"></script>
 <script src="js/features/profile.js"></script>
 <script src="js/features/activity.js"></script>
+<script src="js/features/follow-requests.js"></script>
 <script src="js/features/chat.js"></script>
 <script src="js/features/chat-media.js"></script>
 <script src="js/features/calls.js"></script>
 <script src="js/features/loors-engine.js"></script>
 <script src="js/features/loors.js"></script>
+<script src="js/features/loors-share.js"></script>
 <script src="js/features/audio-library.js"></script>
 <script src="js/features/notes.js"></script>
+<script src="js/features/notifications.js"></script>
 <script src="js/features/verification-admin.js"></script>
 <script src="js/core/stability.js"></script>
 <script src="js/app.js"></script>

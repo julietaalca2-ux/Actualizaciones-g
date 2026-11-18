@@ -1,6 +1,6 @@
 /* ÖG — Service Worker (og-mobile-dev) */
 
-const VERSION = '1.5.6';
+const VERSION = '1.6.7';
 const CACHE_PREFIX = 'og-mobile-dev-';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 
@@ -35,7 +35,10 @@ const APP_SHELL = [
   'css/profile.css',
   'css/settings.css',
   'css/loors.css',
+  'css/loors-share.css',
   'css/notes.css',
+  'css/notifications.css',
+  'css/activity.css',
   'css/verification.css',
   'css/style.css',
   'css/animations.css',
@@ -47,8 +50,11 @@ const APP_SHELL = [
   'js/core/pwa.js',
   'js/core/navigation.js',
   'js/core/realtime.js',
+  'js/core/sounds.js',
+  'js/core/last-seen.js',
   'js/core/stability.js',
   'js/features/activity.js',
+  'js/features/follow-requests.js',
   'js/features/auth.js',
   'js/features/chat.js',
   'js/features/chat-media.js',
@@ -61,7 +67,9 @@ const APP_SHELL = [
   'js/features/stories.js',
   'js/features/loors-engine.js',
   'js/features/loors.js',
+  'js/features/loors-share.js',
   'js/features/notes.js',
+  'js/features/notifications.js',
   'js/features/audio-library.js',
   'js/features/verified.badge.js',
   'js/features/verification.js',
@@ -222,3 +230,55 @@ async function staleWhileRevalidate(event, req) {
   }
   return (await network) || new Response('', { status: 503, statusText: 'Sin conexión' });
 }
+
+/* ---------- Notificaciones push (llegan con la app cerrada) ---------- */
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch (e) {
+    payload = { title: 'ÖG', body: event.data ? event.data.text() : '' };
+  }
+
+  event.waitUntil((async () => {
+    // Si la app está abierta y a la vista, ella misma muestra el aviso de arriba
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (clients.some((c) => c.visibilityState === 'visible' && c.focused)) return;
+
+    const type = payload.data && payload.data.type;
+    await self.registration.showNotification(payload.title || 'ÖG', {
+      body: payload.body || '',
+      icon: payload.icon || toURL('icons/icon-192.png'),
+      badge: payload.badge || toURL('icons/icon-192.png'),
+      tag: payload.tag || undefined,
+      renotify: false,
+      requireInteraction: type === 'call',
+      data: payload.data || {},
+      timestamp: Date.now()
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const existing = clients.find((c) => c.url.startsWith(SCOPE)) || clients[0];
+    if (existing) {
+      await existing.focus();
+      existing.postMessage({ type: 'OG_NOTIF_CLICK', data });
+      return;
+    }
+    const url = new URL('./', SCOPE);
+    url.searchParams.set('ognotif', encodeURIComponent(JSON.stringify(data)));
+    await self.clients.openWindow(url.href);
+  })());
+});
+
+/* El navegador renovó la suscripción: la app la vuelve a registrar al abrirse */
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    clients.forEach((c) => c.postMessage({ type: 'OG_PUSH_RESUBSCRIBE' }));
+  })());
+});
